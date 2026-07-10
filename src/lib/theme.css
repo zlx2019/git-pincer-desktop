@@ -1,0 +1,119 @@
+/* 全局统一 IDEA New UI 暗色(2026-07-10 定稿, 样式基准见 docs/IDEA_STYLE.md):
+   三层灰 #1e1f22 画布 / #2b2d30 面板 / #393b40 分隔线;
+   PINCER 橙只出现在 logo / 活动 tab 下划线 / 终端光标三处 */
+:root {
+  --font-ui: -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --d-canvas: #1e1f22;
+  --d-panel: #2b2d30;
+  --d-border: #393b40;
+  --d-border-strong: #43454a;
+  --d-hover: #35373c;
+  --d-text: #dfe1e5;
+  --d-dim: #9da0a8;
+  --d-dimmer: #7d818a;
+  --d-blue: #3574f0;
+  --d-blue-lt: #8ab4ff;
+  --d-sel: #2e436e;
+  --d-sel-text: #b6c4dd;
+  --d-green: #5fad65;
+  --d-red: #e46962;
+  --d-amber: #d9a343;
+  --d-orange: #ff7a2f;
+  --d-term: #1a1b1e;
+
+  /* 三栏 chunk 底色(IDEA Dark diff 初值, M5 逐像素校准) */
+  --chunk-added: #294436;
+  --chunk-modified: #385570;
+  --chunk-deleted: #3f4145;
+  --chunk-conflict: #45302b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--d-text);
+  background: var(--d-canvas);
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.dim {
+  color: var(--d-dim);
+}
+
+button {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  height: 26px;
+  padding: 0 14px;
+  border: 1px solid var(--d-border-strong);
+  border-radius: 4px;
+  background: var(--d-panel);
+  color: var(--d-text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--d-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--d-blue);
+  border-color: var(--d-blue);
+  color: #ffffff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #2f63d6;
+  border-color: #2f63d6;
+}
+
+button:focus-visible {
+  outline: 2px solid #3a5fae;
+  outline-offset: 1px;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--d-blue);
+}
+
+/* git 输出控制台(冲突页 Continue 输出), 终端风 */
+.console {
+  width: 100%;
+  max-width: 680px;
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  background: var(--d-term);
+  color: var(--d-text);
+  border: 1px solid #121316;
+  border-radius: 8px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.console .stderr {
+  color: var(--d-red);
+}
