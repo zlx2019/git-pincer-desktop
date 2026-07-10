@@ -1,0 +1,43 @@
+# ── Rust ──────────────────────────────
+/src-tauri/target/
+**/*.rs.bk
+.nextest/
+
+# ── 前端 ──────────────────────────────
+node_modules
+/build
+/.svelte-kit
+/package
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# ── IDE / 编辑器 ──────────────────────
+.idea/
+*.iml
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# ── 系统文件 ──────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 日志与环境 ────────────────────────
+*.log
+/tmp/
+.env
+.env.*
+!.env.example
+
+# ── 覆盖率产物 ────────────────────────
+*.gcda
+*.gcno
+tarpaulin-report.html
+coverage/
+
+# ── AI 辅助与本地文档 ─────────────────
+.claude/

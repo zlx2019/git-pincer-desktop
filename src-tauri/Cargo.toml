@@ -1,0 +1,44 @@
+[package]
+name = "git-pincer-desktop"
+version = "0.1.0"
+description = "IDEA-style three-pane Git conflict resolver — desktop app for git-pincer"
+authors = ["Zero <zero9501@outlook.com>"]
+edition = "2024"
+rust-version = "1.96.0"
+license = "MIT"
+
+[lib]
+# `_lib` 后缀用于区分 lib 与 bin 的产物名,避免在 Windows 上冲突
+# 见 https://github.com/rust-lang/cargo/issues/8519
+name = "git_pincer_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+similar = "3.1"
+
+### Lint 规则(对齐 rust-template)
+[lints.rust]
+unsafe_code = "warn"      # 使用 unsafe 代码时告警
+missing_docs = "warn"     # 公共项缺少文档注释时告警
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+dbg_macro = "warn"
+
+### Production packaging configuration
+[profile.release]
+lto = "thin"          # 链接时优化，提升运行性能
+codegen-units = 1     # 单编译单元，优化更充分（编译更慢）
+strip = true          # 剥离调试符号，减小二进制体积
+

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "git-pincer-desktop",
+  "version": "0.1.0",
+  "identifier": "io.github.zlx2019.gitpincer",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "git-pincer",
+        "width": 420,
+        "height": 640,
+        "minWidth": 380,
+        "minHeight": 520
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "IDEA-style Git conflict resolver",
+    "longDescription": "PINCER — resolve Git merge conflicts in an IDEA-style three-pane editor. Launch pull / merge / rebase / cherry-pick / revert and take over conflicts the moment they appear.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- PINCER 应用图标: 深色圆角底 + 品牌橙钳臂夹住蓝色 diff 块 -->
+  <rect width="1024" height="1024" rx="228" fill="#1e1f22"/>
+  <path d="M 404 240 Q 252 512 404 784" fill="none" stroke="#ff7a2f" stroke-width="96" stroke-linecap="round"/>
+  <path d="M 620 240 Q 772 512 620 784" fill="none" stroke="#ff7a2f" stroke-width="96" stroke-linecap="round"/>
+  <rect x="468" y="416" width="88" height="192" rx="24" fill="#3574f0"/>
+</svg>
