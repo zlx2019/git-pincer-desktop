@@ -1,0 +1,54 @@
+# typos 用于检查代码和文档中的英文单词拼写错误。
+
+
+[files]
+# 忽略不需要检测的文件(前端产物/依赖/图标资源/锁文件)
+extend-exclude = [
+    "CHANGELOG.md",
+    "node_modules",
+    "build",
+    ".svelte-kit",
+    "pnpm-lock.yaml",
+    "src-tauri/target",
+    "src-tauri/gen",
+    "src-tauri/icons",
+    "assets",
+]
+ignore-hidden = true  # 忽略隐藏文件
+ignore-vcs = true     # 忽略 .gitignore 中的文件
+ignore-dot = true     # 忽略 .ignore 中的文件
+
+# 检查行为
+[default]
+check-filename = true # 是否检查文件名
+check-file = true     # 是否检查文件内容
+locale = "en"
+binary = false        # 是否检查二进制文件
+unicode = true        # 是否支持 Unicode 标识符
+# 按正则忽略内容（可实现行内 disable 注释）
+extend-ignore-re = [
+    "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",
+    "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
+]
+extend-ignore-identifiers-re = []    # 按正则忽略标识符
+extend-ignore-words-re = []          # 按正则忽略单词
+
+[default.extend-words]
+# 常见但拼写检查器容易误报的开发工具名、库名、协议名和缩写。
+
+# Rust 工具链与生态
+anyhow = "anyhow"
+clippy = "clippy"
+nextest = "nextest"
+rustacean = "rustacean"
+rustc = "rustc"
+rustdoc = "rustdoc"
+rustfmt = "rustfmt"
+rustup = "rustup"
+serde = "serde"
+tauri = "tauri"
+thiserror = "thiserror"
+
+# 本项目术语
+pincer = "pincer"
+rerere = "rerere"
