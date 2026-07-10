@@ -1,0 +1,109 @@
+name: CI
+
+# When pushing the main branch
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # 前端类型检查与构建
+  frontend:
+    name: Svelte Check & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: svelte-check
+        run: pnpm check
+      - name: build
+        run: pnpm build
+
+  # 格式化、Clippy 静态检查与文档构建检查
+  # (tauri 的 generate_context! 编译期要求 build/ 存在, 需先构建前端)
+  lint:
+    name: Format & Clippy & Doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: cargo doc
+        working-directory: src-tauri
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # 单元测试与集成测试（使用 nextest）
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: cargo nextest
+        working-directory: src-tauri
+        run: cargo nextest run --all-features --no-tests pass
+
+  # 依赖的安全公告与许可证审计
+  deny:
+    name: Cargo Deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+
+  # 拼写检查
+  typos:
+    name: Typos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 锁定版本，避免上游 master 变更导致 CI 意外失败（dependabot 会定期升级）
+      - uses: crate-ci/typos@v1.48.0
