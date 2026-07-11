@@ -41,3 +41,4 @@ coverage/
 
 # ── AI 辅助与本地文档 ─────────────────
 .claude/
+.playwright-mcp/
