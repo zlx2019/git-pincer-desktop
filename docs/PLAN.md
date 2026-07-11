@@ -61,6 +61,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `launch_op(kind, targets[]) → LaunchOutcome` | 菜单发起五操作; 输出走 `git://output`; 结束探测: 有冲突 → `Conflicts{files}`, 零退出 → `CleanDone`, 否则 `Failed`; 注入 `GIT_TERMINAL_PROMPT=0` 防无终端挂起 |
 | `branches() → Branch[]` | 本地分支(带当前标记), merge/rebase 对话框数据 |
 | `commits(others_only, limit) → CommitInfo[]` | 最近提交; others_only 只列当前分支未包含的(cherry-pick 场景) |
+| `set_window_form(form)` | 窗口形态(compact/large): 最小尺寸/尺寸/居中单 IPC 完成; AppState 缓存已应用形态, 未变直接跳过 |
 
 事件只有一个: `git://output {stream, line}` (launch/continue 的输出流, 发起前订阅、结束即退订)。
 结局不走事件——launch/continue 的结果由命令返回值带回 (`LaunchOutcome` / `RoundOutcome`, `tag="kind"` 的 tagged union); 旧方案的 `git://round` / `git://done` 未实现也不再计划。
@@ -79,7 +80,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 视图状态模型:
 
 - Result 栏初始 = **base 全文** (IDEA 行为: 所有 chunk 初始待处理, 含非冲突项);
-- 每个 chunk 的三栏行区间放入 CM6 RangeSet → 用户自由编辑时自动 remap;
+- 每个 chunk 的中栏区间存前端 `resultRanges` 数组, 用户自由编辑时在 updateListener 里 `changes.mapPos` 手动 remap(实现定稿, 与 §2 一致);
 - Apply(侧) = 用该侧行替换 Result 中 chunk 当前区间 + 状态记账; Ignore = 仅记账; 均为本地 CM6 事务;
 - 撤销分两轨(实现定稿): 手工编辑走 CM6 历史(⌘Z); chunk 操作走独立撤销栈(底栏 Undo 逐步回退, 接缝 ⟲ 整块回初始), 不与文本历史混编——避免 ⌘Z 撤了文本却留下"已应用"状态的脱节;
 - 自由编辑命中 chunk 区间 → 该 chunk 记为 resolved-by-edit (计数联动); 落在区间外仅文本生效;
@@ -96,7 +97,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 - pull → 直接执行(走当前分支跟踪配置);
 - 结果分流: 出冲突 → 自动切大窗进冲突列表; 干净完成/失败 → 终端 ✔/✘ 尾行留痕。
 
-**窗口策略**: 打开页/菜单 = 紧凑小窗(420×640, min 380×520, 可当桌面侧边小工具); 冲突列表/三栏 = 大窗(1280×800, min 960×640); 路由切换时运行时 setSize + center。**关闭窗口不退出**(2026-07-11 Zero 定): 关闭请求被拦截为隐藏, 应用驻留系统托盘——托盘菜单"显示窗口/退出", Windows/Linux 左键单击唤回, macOS 点 Dock 图标重开; 隐藏不销毁 webview, 会话状态原样保留, 真正退出走托盘菜单(或 ⌘Q)。
+**窗口策略**: 打开页/菜单 = 紧凑小窗(420×640, min 380×520, 可当桌面侧边小工具); 冲突列表/三栏 = 大窗(1280×800, min 960×640); 路由切换时前端调 `set_window_form` 命令, 最小尺寸/尺寸/居中在 Rust 侧一次完成(单 IPC, 2026-07-12 定, 原为 3 次串行 JS API), **形态未变时直接跳过**——同形态路由间跳转不再把用户移动/调整过的窗口拽回屏幕中心。窗口配置 `visible:false` + 前端首帧后 `show()`(防启动白闪), `backgroundColor` = 画布色 #1e1f22(防 resize 白边), `theme: Dark`(Windows 标题栏恒暗), `acceptFirstMouse: true`(macOS 未聚焦首击即生效)。**关闭窗口不退出**(2026-07-11 Zero 定): 关闭请求被拦截为隐藏, 应用驻留系统托盘——托盘菜单"显示窗口/退出", Windows/Linux 左键单击唤回, macOS 点 Dock 图标重开; 隐藏不销毁 webview, 会话状态原样保留, 真正退出走托盘菜单(或 ⌘Q)。
 
 ### 5.1 Conflicts 文件列表 (参考图 1)
 
@@ -132,10 +133,10 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 | 组件 | 要点 |
 |---|---|
 | 三个 CM6 实例 | 侧栏只读; 关软换行 (行高恒定简化几何); 行号; 语法高亮按扩展名加载语言包, 自写 IDEA Dark HighlightStyle |
-| chunk 底色 | `Decoration.line`; 中栏区间在前端 `resultRanges` 手动 remap(`changes.mapPos`), 装饰经 Compartment 重建——侧栏按类名签名跳过未变栏, 手工打字只重建中栏 |
-| 接缝条 ×2 | **44px**(2026-07-11 定稿, 原 ~28px)竖条内嵌 SVG: 每个可见 chunk 画 侧栏区间→Result区间 贝塞尔封闭带 (同底色, 控制点在两端 30% 处成 IDEA 斜扫); ✕ / ≫ / ≪ 按钮浮于其上; 滚动/编辑 rAF 节流重绘; y 坐标取自 `lineBlockAt`; 按中栏 viewport 粗筛, 屏外 chunk 不算不画 |
+| chunk 底色 | `Decoration.line`; 中栏区间在前端 `resultRanges` 手动 remap(`changes.mapPos`), 装饰经 Compartment 重建且**只建视口裁剪窗口内的行**(视口 ±400 行, 逼近边缘 100 行内才按新窗口重建, 2026-07-12 定)——成本与视口成正比, 2MB 降级单 chunk 也不逐键卡顿; 侧栏"类名签名 + 裁剪窗口"双未失效即跳过, 手工打字只重建中栏 |
+| 接缝条 ×2 | **44px**(2026-07-11 定稿, 原 ~28px)竖条内嵌 SVG: 每个可见 chunk 画 侧栏区间→Result区间 贝塞尔封闭带 (同底色, 控制点在两端 30% 处成 IDEA 斜扫); ✕ / ≫ / ≪ 按钮浮于其上; 滚动/编辑 rAF 节流重绘; 几何统一在 seamGeoms 每帧算一次(坐标基准每栏只读一次, 布局读取集中在模板写入前), y 坐标取自 `lineBlockAt`; 按中栏 viewport 粗筛, 屏外 chunk 不算不画 |
 | gutter 按钮 | 左栏块 `✕ ≫`、右栏块 `≪ ✕` 镜像; hover 显示 tooltip; applied 后变 undo 图标 |
-| 同步滚动 | 以 chunk 三栏区间起始行为锚点分段线性插值 × 行高; 标记驱动源防回声 |
+| 同步滚动 | 以 chunk 三栏区间起始行为锚点分段线性插值 × 行高; 程序写入的 scrollTop 逐目标记账, 目标栏的回声 scroll 事件直接吞掉(2026-07-12 定, 原 rAF 全局锁有 1px 抖动) |
 | overview ruler | 最右 ~12px: 全文 chunk 色块缩略(实时区间换算, 编辑后不漂移), 点击按滚动高度比例跳转 |
 | 顶栏 | ↑↓ 上/下一个 change (自动滚三栏); ⋙ 组 = 批量应用非冲突 (Left/All/Right); Highlight words ▾ = words/none 切换 |
 | 底栏 | Accept Left/Right = 整文件取侧; Cancel = 放弃本文件改动回列表; **Apply** = Result 全文 `save_result` 后回列表刷新 |
@@ -175,8 +176,8 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 
 ## 9. 风险
 
-- 超大输入/病态 diff → Rust 侧 500ms deadline + 任一侧 >2MB 整文件降级守护兜底(词级强调另设 200 行 / 1000 字符上限);
-- 接缝 SVG 与滚动帧同步 → rAF 节流 + viewport 粗筛, 兜底直角折线;
+- 超大输入/病态 diff → Rust 侧 500ms deadline + 任一侧 >2MB 整文件降级守护兜底(词级强调另设 200 行 / 1000 字符上限); 降级后的整文件单 chunk 由装饰视口裁剪兜底, 逐键重建不随文件大小恶化;
+- 接缝 SVG 与滚动帧同步 → rAF 节流 + viewport 粗筛 + seamGeoms 单点采集, 兜底直角折线;
 - webkit2gtk (Linux) 字体度量差异 → M5 专项校准;
 - 删除-修改、双添加等边角 stage 组合 → M1 用 playground 全场景覆盖。
 
@@ -184,4 +185,8 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 
 - Conflicts 与三栏为**单窗口内路由页**切换, 不开子窗口(小窗↔大窗靠运行时改尺寸);
 - **全局统一 IDEA New UI 暗色**(2026-07-10 Zero 拍板): 冲突大窗布局按参考图 1:1、配色换 IDEA Dark、文案英文; 菜单小窗带中文说明;
-- 撤销只在会话内有效, Apply 落盘后不可撤 (可重新 checkout 制造冲突, 不在本工具内做)。
+- 撤销只在会话内有效, Apply 落盘后不可撤 (可重新 checkout 制造冲突, 不在本工具内做);
+- **构建 profile**(2026-07-12 定): dev 下依赖统一 O2(similar 热循环走优化码路, `pnpm tauri dev` 体验≈release; 首次构建慢一次, 本 crate 保持 O0 快增量), release 用完整 LTO + codegen-units=1 + opt-level=3 + strip; **不用 `panic = "abort"`**——保留展开让 spawn_blocking 里的意外 panic 落成前端 toast 而非整个应用崩溃, 尾部收益不值这个失效模式;
+- **终端缓冲**: `git://output` 前端 rAF 合帧批量落地, 缓冲上限 2000 条(超限整批丢最旧), 长会话 DOM 不无界增长;
+- **聚焦重探限频**: 800ms 冷却 + 进行中不叠加(菜单页与冲突列表页共同约定);
+- **生产加固**: 禁浏览器右键菜单(可编辑区/有选区除外, 选区保留原生 Copy)与刷新/打印快捷键(刷新丢会话状态); dev 构建不受限。

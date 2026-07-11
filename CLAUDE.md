@@ -12,7 +12,8 @@ IDEA 风格的 Git 冲突解决桌面端 (Tauri 2 + SvelteKit/Svelte 5 + CodeMir
 
 ```bash
 pnpm install              # pnpm 版本由 package.json 的 packageManager 锁定 (10.13.1), Node >= 22
-pnpm tauri dev            # 运行应用 (vite 端口固定 1420 strictPort, 被占用直接失败)
+pnpm tauri dev            # 运行应用 (vite 端口固定 1420 strictPort, 被占用直接失败;
+                          #  dev 下依赖以 O2 编译——clean 后首次构建慢几分钟, 换来合并引擎 dev 体验≈release)
 pnpm check                # svelte-check 类型检查
 pnpm test                 # vitest 前端纯逻辑单测 (src/lib/*.test.ts, node 环境)
 pnpm build                # 前端构建 → build/
@@ -62,14 +63,14 @@ git 二进制 (继承用户 credentials/hooks/rerere 配置)
 
 - **IPC 契约**: `src/lib/api.ts` 与 Rust serde 输出严格镜像，casing 规则——struct 字段 camelCase；单元枚举 lowercase（`ChunkKind`/`ChunkVisual`/`SideStatus`/`PickSide`）或 kebab-case（`Op`/`LaunchKind`）；`LaunchOutcome`/`RoundOutcome` 是 `tag = "kind"` 的 tagged union（`cleanDone|conflicts|failed` / `done|nextRound|failed`）。行区间一律 **0-based 半开 `[start, end)`**；词级强调三元组 `[chunk 内行, UTF-16 起, UTF-16 止]`（与 CM6 文档坐标一致）。改任何命令签名/结构体，两侧同步改。
 - **合并引擎不变量** (merge.rs, 纯函数): 两次行级 Myers diff (`base→ours`, `base→theirs`) 按 base 区间碰撞归簇（相触即归并），**宁可多报冲突不静默错合**；守护: 500ms diff deadline、任一侧 >2MB 降级整文件单冲突、>200 行 chunk 跳过词级强调。二进制判定在 repo.rs：工作区文件**前 8KB 含 NUL**（读不到按文本处理），binary 行走 pick-one 不进三栏。
-- **三栏视图模型**: Result 栏初始 = base 全文（IDEA 行为）；chunk 的中栏区间存前端 `resultRanges` 数组，在 CM6 updateListener 里用 `changes.mapPos` 手动 remap（不是 RangeSet 自动映射）；装饰经 Compartment.reconfigure 全量重建（queueMicrotask 合批）。撤销分两轨——手工编辑走 CM6 历史 (⌘Z)；chunk 操作带 `chunkOp` annotation + `addToHistory.of(false)`，走独立撤销栈，不混编。已应用一侧后再应用另一侧 = **追加**到区间尾（keep both，对齐 CLI 的 take order）。
+- **三栏视图模型**: Result 栏初始 = base 全文（IDEA 行为）；chunk 的中栏区间存前端 `resultRanges` 数组，在 CM6 updateListener 里用 `changes.mapPos` 手动 remap（不是 RangeSet 自动映射）；装饰经 Compartment.reconfigure 重建（queueMicrotask 合批），**只建视口裁剪窗口内的行**（视口 ±400 行、逼近边缘 100 行才重建，纯函数 paddedClip/clipCovers 在 chunks.ts）——侧栏"类名签名 + 裁剪窗口"双未失效即跳过；接缝几何统一在 seamGeoms derived 每帧算一次（布局读取集中在模板写入前）；同步滚动以"程序写入记账"吞回声（editor.ts linkScroll）。撤销分两轨——手工编辑走 CM6 历史 (⌘Z)；chunk 操作带 `chunkOp` annotation + `addToHistory.of(false)`，走独立撤销栈，不混编。已应用一侧后再应用另一侧 = **追加**到区间尾（keep both，对齐 CLI 的 take order）。
 - **git 安全策略** (repo.rs): 参数永远按数组传递不经 shell；所有流式命令（launch 与 continue）统一注入 `GIT_EDITOR=true` `GIT_SEQUENCE_EDITOR=true` `GIT_TERMINAL_PROMPT=0` 且 stdin 置 null；统一入口清洗宿主 `GIT_DIR` 类环境变量（SCRUBBED_ENV）。
 - **结局分流**: launch/continue 结束后**只要 `conflicts()` 非空即接管，与退出码无关**；干净且零退出才算完成。`git://output` 监听是发起前订阅、finally 退订的 JIT 模式，无操作等待期间的输出会被丢弃。
 - **顺序不变量**: cherry-pick 对话框列表新→旧，确认后反转为**旧→新**逐个应用；revert 保持新→旧。
-- **路由即窗口形态** (`src/lib/win.ts`): `/`(打开页) 与 `/menu`(指令面板) 用紧凑小窗 420×640；`/conflicts` 与 `/merge` 切大窗 1280×800。跨页会话状态在 `src/lib/state.svelte.ts` 的 `session` ($state rune)——刷新即失，除打开页外所有路由 onMount 都守卫 `!session.info → goto('/')`（/menu 还会在 op 存在时转 /conflicts）。
+- **路由即窗口形态** (`src/lib/win.ts`): `/`(打开页) 与 `/menu`(指令面板) 用紧凑小窗 420×640；`/conflicts` 与 `/merge` 切大窗 1280×800。尺寸/最小尺寸/居中由 Rust 命令 `set_window_form` 单 IPC 完成，**形态未变直接跳过**（不拽回用户移动过的窗口）；窗口 `visible:false` 启动、+layout 首帧后 `show()`（防白闪），`backgroundColor`/`theme: Dark`/`acceptFirstMouse` 在 tauri.conf.json。跨页会话状态在 `src/lib/state.svelte.ts` 的 `session` ($state rune)——刷新即失，除打开页外所有路由 onMount 都守卫 `!session.info → goto('/')`（/menu 还会在 op 存在时转 /conflicts）。终端缓冲经 `pushTerm` 落地（上限 2000 条），高频输出用 `src/lib/batch.ts` 的 rafBatcher 合帧；聚焦重探 800ms 限频。
 - **接管机制**: 无论操作在面板发起还是终端发起，窗口重获焦点会重探仓库状态，出现冲突即接管切大窗。例外是**搁置**（`session.parked`）：冲突页 Close 置位后回菜单小窗，/menu 守卫与聚焦重探都放行；恢复入口是菜单顶部的琥珀横幅（点击清搁置回 /conflicts），op 进行中五条指令与分支切换禁用；重探发现 op 已结束（外部完成/中止）时搁置自动失效。冲突现场无需持久化——全在 git 仓库里，恢复即重新推导。
 - **托盘驻留** (lib.rs, tauri `tray-icon` feature): 关闭窗口被 `on_window_event` 拦截为隐藏，应用驻留系统托盘（菜单"显示窗口/退出"；Windows/Linux 左键单击唤回，macOS 左键弹菜单、点 Dock 图标经 `RunEvent::Reopen` 唤回）。隐藏不销毁 webview，session 状态原样保留；真正退出走托盘菜单。托盘全在 Rust 侧，无需 capabilities 白名单。
-- **能力白名单**: 前端调用的窗口/插件 API 必须列入 `src-tauri/capabilities/default.json`（现有 core/dialog/opener + window 的 set-size/set-min-size/center），否则运行时被拒。
+- **能力白名单**: 前端调用的窗口/插件 API 必须列入 `src-tauri/capabilities/default.json`（现有 core/dialog/opener + window 的 show/set-focus；窗口尺寸类操作已收进 Rust 命令，无需白名单），否则运行时被拒。
 
 ## 约定
 
