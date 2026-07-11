@@ -12,9 +12,10 @@ import { HighlightStyle, LanguageDescription, syntaxHighlighting } from '@codemi
 import { languages } from '@codemirror/language-data';
 import { tags as t } from '@lezer/highlight';
 import type { MergeChunk } from './api';
+import { lineRangeToPos, paneRange, type Pane } from './chunks';
 
-/** 栏位标识 */
-export type Pane = 'left' | 'result' | 'right';
+// 纯几何/区间逻辑在 chunks.ts(可 node 单测), 此处转出保持既有导入路径
+export { lineRangeToPos, paneRange, type Pane };
 
 /** IDEA New UI Dark 编辑器外观 */
 export const ideaTheme = EditorView.theme(
@@ -68,24 +69,6 @@ export async function languageFor(path: string): Promise<Extension> {
   } catch {
     return [];
   }
-}
-
-/** 该 chunk 在指定栏位的行区间; 未触及该栏(单侧改动的对侧)返回 null 不着色 */
-export function paneRange(c: MergeChunk, pane: Pane): [number, number] | null {
-  if (pane === 'left') return c.kind === 'theirs' ? null : c.leftRange;
-  if (pane === 'right') return c.kind === 'ours' ? null : c.rightRange;
-  return c.resultRange;
-}
-
-/** 行区间 → 文档位置区间: from = 首行行首, to = 末行下一行行首(区间尾为文末则取文末) */
-export function lineRangeToPos(
-  doc: EditorState['doc'],
-  range: [number, number]
-): { from: number; to: number } {
-  const [s, e] = range;
-  const from = s < doc.lines ? doc.line(s + 1).from : doc.length;
-  const to = e <= s ? from : e < doc.lines ? doc.line(e + 1).from : doc.length;
-  return { from, to };
 }
 
 /** 行号槽底色标记(复用 chunk 类名, 让色带视觉上穿过行号列) */

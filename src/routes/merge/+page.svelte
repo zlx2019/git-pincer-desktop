@@ -9,6 +9,15 @@
   import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
   import { syntaxHighlighting } from '@codemirror/language';
   import { api, type MergeChunk, type MergeSnapshot } from '$lib/api';
+  import {
+    applyAllTargets,
+    applyEdit,
+    isResolved,
+    joinedText,
+    navTarget,
+    paneClass,
+    type ChunkState,
+  } from '$lib/chunks';
   import { session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { largeWindow } from '$lib/win';
@@ -27,12 +36,6 @@
 
   const path = $derived(page.url.searchParams.get('path') ?? '');
 
-  type SideState = 'pending' | 'applied' | 'ignored';
-  interface ChunkState {
-    ours: SideState;
-    theirs: SideState;
-    edited: boolean;
-  }
   interface UndoEntry {
     id: number;
     text: string;
@@ -63,6 +66,7 @@
   let undoStack = $state<UndoEntry[]>([]);
   let curIdx = $state(-1);
   let scrollTick = $state(0);
+  let docTick = $state(0);
   let mounted = $state(false);
 
   let leftEl: HTMLElement | undefined = $state();
@@ -77,12 +81,25 @@
   const centerComp = new Compartment();
   const rightComp = new Compartment();
   let decoScheduled = false;
+  // 侧栏装饰的类名签名缓存: 签名不变(手工打字的高频路径)就跳过该栏重建
+  let sideSigL = '';
+  let sideSigR = '';
 
-  const totalResultLines = $derived.by(() => (snap ? snap.result.split('\n').length : 1));
   const changesLeft = $derived.by(() => states.filter((_, i) => !resolved(i)).length);
   const conflictsLeft = $derived.by(() =>
     snap ? snap.chunks.filter((c) => c.kind === 'conflict' && !resolved(c.id)).length : 0
   );
+  /// 接缝渲染的视口粗筛: 只保留中栏实时区间与 CM6 viewport(自带上下外扩余量)相交的 chunk,
+  /// 屏外 chunk 不再逐帧计算几何与绘制路径/按钮
+  const visibleChunks = $derived.by(() => {
+    void scrollTick;
+    if (!mounted || !snap || !views[1]) return [];
+    const vp = views[1].viewport;
+    return snap.chunks.filter((c) => {
+      const r = resultRanges[c.id];
+      return r && r.to >= vp.from && r.from <= vp.to;
+    });
+  });
 
   onMount(() => {
     largeWindow().catch(() => {});
@@ -185,6 +202,7 @@
             r.to = u.changes.mapPos(r.to, 1);
           }
           if (!isOp) scheduleDecos();
+          docTick += 1;
           scrollTick += 1;
         }
       }),
@@ -201,36 +219,17 @@
     return anchors;
   }
 
-  // ── chunk 状态与计数 ─────────────────────────────
-
-  /** 该 chunk 需要处理的侧 */
-  function relevantSides(c: MergeChunk): ('ours' | 'theirs')[] {
-    if (c.kind === 'ours' || c.kind === 'agree') return ['ours'];
-    if (c.kind === 'theirs') return ['theirs'];
-    return ['ours', 'theirs'];
-  }
+  // ── chunk 状态与计数(纯逻辑在 $lib/chunks, 此处按 id 取上下文) ──
 
   /** chunk 是否已解决(手工编辑或相关侧全部处理) */
   function resolved(id: number): boolean {
-    const c = snap?.chunks[id];
-    const st = states[id];
-    if (!c || !st) return false;
-    return st.edited || relevantSides(c).every((s) => st[s] !== 'pending');
+    return isResolved(snap?.chunks[id], states[id]);
   }
 
   // ── 装饰重建 ─────────────────────────────────────
 
-  function leftClass(c: MergeChunk): string | null {
-    if (c.kind === 'theirs') return null;
-    const st = states[c.id];
-    return st.edited || st.ours !== 'pending' ? 'ck-done' : `ck-${c.visual}`;
-  }
-
-  function rightClass(c: MergeChunk): string | null {
-    if (c.kind === 'ours') return null;
-    const st = states[c.id];
-    return st.edited || st.theirs !== 'pending' ? 'ck-done' : `ck-${c.visual}`;
-  }
+  const leftClass = (c: MergeChunk) => paneClass(c, states[c.id], 'left');
+  const rightClass = (c: MergeChunk) => paneClass(c, states[c.id], 'right');
 
   function centerClass(c: MergeChunk): string {
     const cls = resolved(c.id) ? 'ck-done' : `ck-${c.visual}`;
@@ -265,9 +264,19 @@
         gutterLineClass.of(gutters),
       ];
     };
-    lv.dispatch({ effects: leftComp.reconfigure(mk(lv, 'left', leftClass)) });
+    // 侧栏文档只读不变, 装饰仅随 chunk 状态变: 类名签名相同就跳过该栏重建
+    // (手工打字只触发中栏重建, 侧栏的词级强调不再逐键重算)
+    const sigL = snap.chunks.map(leftClass).join(' ');
+    if (sigL !== sideSigL) {
+      sideSigL = sigL;
+      lv.dispatch({ effects: leftComp.reconfigure(mk(lv, 'left', leftClass)) });
+    }
+    const sigR = snap.chunks.map(rightClass).join(' ');
+    if (sigR !== sideSigR) {
+      sideSigR = sigR;
+      rv.dispatch({ effects: rightComp.reconfigure(mk(rv, 'right', rightClass)) });
+    }
     cv.dispatch({ effects: centerComp.reconfigure(mk(cv, 'result', centerClass)) });
-    rv.dispatch({ effects: rightComp.reconfigure(mk(rv, 'right', rightClass)) });
     scrollTick += 1;
   }
 
@@ -296,30 +305,15 @@
     });
   }
 
-  /** 区间替换文本组装: 维持行边界(区间尾在行首时补尾换行) */
-  function joined(lines: string[], to: number): string {
-    if (!lines.length) return '';
-    const docLen = views[1].state.doc.length;
-    return lines.join('\n') + (to < docLen ? '\n' : '');
-  }
-
   /** 应用一侧到 Result; 已有一侧应用时追加(保留双方, 语义同 CLI 的 take order) */
   function applySide(id: number, side: 'ours' | 'theirs') {
     const c = snap?.chunks[id];
     const st = states[id];
     if (!c || !st || st[side] !== 'pending') return;
     pushUndo(id);
-    const lines = sideLines(c, side);
-    const r = resultRanges[id];
     const both = st.ours === 'applied' || st.theirs === 'applied';
-    if (both) {
-      const docLen = views[1].state.doc.length;
-      let insert = joined(lines, r.to);
-      if (insert && r.to >= docLen && docLen > 0) insert = '\n' + insert;
-      dispatchOp(r.to, r.to, insert);
-    } else {
-      dispatchOp(r.from, r.to, joined(lines, r.to));
-    }
+    const e = applyEdit(sideLines(c, side), resultRanges[id], both, views[1].state.doc.length);
+    dispatchOp(e.from, e.to, e.insert);
     st[side] = 'applied';
     if (c.kind === 'agree') {
       st.ours = 'applied';
@@ -349,7 +343,7 @@
     pushUndo(id);
     const r = resultRanges[id];
     const base = baseLines.slice(c.resultRange[0], c.resultRange[1]);
-    dispatchOp(r.from, r.to, joined(base, r.to));
+    dispatchOp(r.from, r.to, joinedText(base, r.to, views[1].state.doc.length));
     states[id] = { ours: 'pending', theirs: 'pending', edited: false };
     scheduleDecos();
   }
@@ -364,16 +358,10 @@
     scheduleDecos();
   }
 
-  /** 批量应用非冲突 chunk */
+  /** 批量应用非冲突 chunk; agree 双方内容一致, 两个方向都放行(applySide 会同时记账双侧) */
   function applyAll(direction: 'left' | 'all' | 'right') {
     if (!snap) return;
-    for (const c of snap.chunks) {
-      if (c.kind === 'conflict') continue;
-      if (direction === 'left' && c.kind === 'theirs') continue;
-      if (direction === 'right' && c.kind !== 'theirs') continue;
-      const side = c.kind === 'theirs' ? 'theirs' : 'ours';
-      if (states[c.id][side] === 'pending' && !states[c.id].edited) applySide(c.id, side);
-    }
+    for (const t of applyAllTargets(snap.chunks, states, direction)) applySide(t.id, t.side);
   }
 
   /** 上/下一个未解决 chunk(无未解决时在全部 chunk 间循环) */
@@ -383,10 +371,7 @@
     const open = ids.filter((i) => !resolved(i));
     const pool = open.length ? open : ids;
     if (!pool.length) return;
-    curIdx =
-      dir > 0
-        ? (pool.find((i) => i > curIdx) ?? pool[0])
-        : ([...pool].reverse().find((i) => i < curIdx) ?? pool[pool.length - 1]);
+    curIdx = navTarget(pool, curIdx, dir);
     const r = resultRanges[curIdx];
     views[1].dispatch({ effects: EditorView.scrollIntoView(r.from, { y: 'center' }) });
     scheduleDecos();
@@ -494,14 +479,29 @@
     }
   }
 
-  /** ruler 点击跳转 */
+  /** ruler 色块几何(百分比): 用中栏实时区间与实时行数换算, 编辑后不漂移 */
+  function rulerBlock(c: MergeChunk): { top: number; h: number } | null {
+    void docTick;
+    const v = views[1];
+    const r = resultRanges[c.id];
+    if (!mounted || !v || !r) return null;
+    const doc = v.state.doc;
+    const start = doc.lineAt(Math.min(r.from, doc.length)).number - 1;
+    const end = r.to > r.from ? doc.lineAt(Math.min(r.to, doc.length)).number - 1 : start;
+    return {
+      top: (start / Math.max(1, doc.lines)) * 100,
+      h: Math.max(0.5, ((end - start) / Math.max(1, doc.lines)) * 100),
+    };
+  }
+
+  /** ruler 点击跳转: 按实际滚动高度换算(含内边距与实测行高, 编辑后不漂移) */
   function jump(e: MouseEvent) {
     const result = views[1];
-    if (!result || !snap) return;
+    if (!result) return;
     const el = e.currentTarget as HTMLElement;
     const frac = (e.clientY - el.getBoundingClientRect().top) / el.clientHeight;
-    const center = frac * totalResultLines * result.defaultLineHeight;
-    result.scrollDOM.scrollTop = Math.max(0, center - result.scrollDOM.clientHeight / 2);
+    const sd = result.scrollDOM;
+    sd.scrollTop = Math.max(0, frac * sd.scrollHeight - sd.clientHeight / 2);
   }
 </script>
 
@@ -548,7 +548,7 @@
 
       <div class="seam" onwheel={seamWheel}>
         <svg class="band" width={SEAM} height="100%">
-          {#each snap.chunks as c (c.id)}
+          {#each visibleChunks as c (c.id)}
             {@const g = chunkGeom(c, 'l')}
             {#if g}
               <path
@@ -560,7 +560,7 @@
             {/if}
           {/each}
         </svg>
-        {#each snap.chunks as c (c.id)}
+        {#each visibleChunks as c (c.id)}
           {@const g = chunkGeom(c, 'l')}
           {#if g}
             <div class="gbtns" style="top:{g.ys1 + 1}px">
@@ -579,7 +579,7 @@
 
       <div class="seam" onwheel={seamWheel}>
         <svg class="band" width={SEAM} height="100%">
-          {#each snap.chunks as c (c.id)}
+          {#each visibleChunks as c (c.id)}
             {@const g = chunkGeom(c, 'r')}
             {#if g}
               <path
@@ -591,7 +591,7 @@
             {/if}
           {/each}
         </svg>
-        {#each snap.chunks as c (c.id)}
+        {#each visibleChunks as c (c.id)}
           {@const g = chunkGeom(c, 'r')}
           {#if g}
             <div class="gbtns right" style="top:{g.ys1 + 1}px">
@@ -610,13 +610,13 @@
 
       <div class="ruler" onclick={jump} role="presentation">
         {#each snap.chunks as c (c.id)}
-          <span
-            class="rb ck-{resolved(c.id) ? 'done' : c.visual}"
-            style="top:{(c.resultRange[0] / Math.max(1, totalResultLines)) * 100}%;height:{Math.max(
-              0.5,
-              ((c.resultRange[1] - c.resultRange[0]) / Math.max(1, totalResultLines)) * 100
-            )}%"
-          ></span>
+          {@const rb = rulerBlock(c)}
+          {#if rb}
+            <span
+              class="rb ck-{resolved(c.id) ? 'done' : c.visual}"
+              style="top:{rb.top}%;height:{rb.h}%"
+            ></span>
+          {/if}
         {/each}
       </div>
     </div>
