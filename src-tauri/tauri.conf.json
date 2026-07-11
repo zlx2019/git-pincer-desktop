@@ -12,11 +12,17 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "git-pincer",
         "width": 420,
         "height": 640,
         "minWidth": 380,
-        "minHeight": 520
+        "minHeight": 520,
+        "center": true,
+        "visible": false,
+        "acceptFirstMouse": true,
+        "backgroundColor": "#1e1f22",
+        "theme": "Dark"
       }
     ],
     "security": {

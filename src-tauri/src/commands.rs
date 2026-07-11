@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::ShellError;
@@ -14,10 +14,21 @@ use crate::repo::{Branch, CommitInfo, FileRow, LaunchKind, Op, PickSide, Repo, T
 /// 最近仓库列表的最大长度
 const RECENT_LIMIT: usize = 10;
 
-/// 全局状态: 仅保存当前打开仓库的定位
+/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态
 #[derive(Default)]
 pub struct AppState {
     repo: Mutex<Option<Repo>>,
+    win_form: Mutex<Option<WinForm>>,
+}
+
+/// 窗口形态(路由决定): 小窗 = 打开页/菜单, 大窗 = 冲突列表/三栏
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WinForm {
+    /// 紧凑小窗 420×640
+    Compact,
+    /// 大窗 1280×800
+    Large,
 }
 
 /// 仓库概要: 打开页与列表页头部所需的全部信息
@@ -79,6 +90,36 @@ pub struct OutputLine {
     pub stream: &'static str,
     /// 行内容
     pub line: String,
+}
+
+/// 应用窗口形态: 最小尺寸/尺寸/居中一次完成(单次 IPC, 无多段跳变);
+/// 形态未变时为空操作——不把用户手动移动或调整过的窗口拽回屏幕中心
+#[tauri::command]
+pub async fn set_window_form(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    form: WinForm,
+) -> Result<(), ShellError> {
+    {
+        let mut cur = state.win_form.lock().unwrap_or_else(|e| e.into_inner());
+        if *cur == Some(form) {
+            return Ok(());
+        }
+        *cur = Some(form);
+    }
+    let Some(win) = app.get_webview_window("main") else {
+        return Ok(());
+    };
+    let ((min_w, min_h), (w, h)) = match form {
+        WinForm::Compact => ((380.0, 520.0), (420.0, 640.0)),
+        WinForm::Large => ((960.0, 640.0), (1280.0, 800.0)),
+    };
+    win.set_min_size(Some(tauri::LogicalSize::new(min_w, min_h)))
+        .map_err(join_err)?;
+    win.set_size(tauri::LogicalSize::new(w, h))
+        .map_err(join_err)?;
+    win.center().map_err(join_err)?;
+    Ok(())
 }
 
 /// 打开新仓库(path 有值)或重探当前仓库(path 为空), 返回概要

@@ -59,6 +59,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            commands::set_window_form,
             commands::repo_open,
             commands::conflicts,
             commands::read_three,
