@@ -14,6 +14,7 @@ IDEA 风格的 Git 冲突解决桌面端 (Tauri 2 + SvelteKit/Svelte 5 + CodeMir
 pnpm install              # pnpm 版本由 package.json 的 packageManager 锁定 (10.13.1), Node >= 22
 pnpm tauri dev            # 运行应用 (vite 端口固定 1420 strictPort, 被占用直接失败)
 pnpm check                # svelte-check 类型检查
+pnpm test                 # vitest 前端纯逻辑单测 (src/lib/*.test.ts, node 环境)
 pnpm build                # 前端构建 → build/
 pnpm tauri build          # 本机打包; 正式发布 = 推 v* 标签走 release.yml
                           # (四平台矩阵: dmg / nsis+msi / AppImage+deb+rpm, git-cliff 生成 changelog)
@@ -33,7 +34,7 @@ typos                                                # 拼写检查
 
 **重要**: `tauri::generate_context!` 编译期要求前端产物 `build/` 存在——首次 clone 或清理后，任何 cargo check/clippy/test 之前必须先 `pnpm build`。
 
-单元测试写在模块末尾 `#[cfg(test)]`（引擎测试在 `merge.rs` 尾部），集成测试在 `src-tauri/tests/plumbing.rs`（真实 git 管道）。写集成测试注意：lib crate 名为 **`git_pincer_desktop_lib`**（非包名）；clippy.toml 的 `allow-unwrap-in-tests` 不覆盖集成测试的辅助函数，文件首行需 `#![allow(clippy::unwrap_used)]`；测试仓库统一注入 `GIT_CONFIG_GLOBAL=/dev/null` + `GIT_CONFIG_SYSTEM=/dev/null` 并在仓库本地关闭 gpgsign/rerere 保证确定性。
+单元测试写在模块末尾 `#[cfg(test)]`（引擎测试在 `merge.rs` 尾部），集成测试在 `src-tauri/tests/plumbing.rs`（真实 git 管道）。前端可测的纯逻辑（chunk 状态机/导航/批量应用/文本组装/区间换算）集中在 `src/lib/chunks.ts`，vitest 测试同目录（`chunks.test.ts`，配置在 `vitest.config.ts`，不经 SvelteKit 插件）——给 merge 页加逻辑时优先抽到该模块并补测试。写集成测试注意：lib crate 名为 **`git_pincer_desktop_lib`**（非包名）；clippy.toml 的 `allow-unwrap-in-tests` 不覆盖集成测试的辅助函数，文件首行需 `#![allow(clippy::unwrap_used)]`；测试仓库统一注入 `GIT_CONFIG_GLOBAL=/dev/null` + `GIT_CONFIG_SYSTEM=/dev/null` 并在仓库本地关闭 gpgsign/rerere 保证确定性。
 
 测试数据用姊妹仓库的演练场生成（含 merge / 两轮 rebase / cherry-pick / revert / 二进制场景）：
 
@@ -41,7 +42,7 @@ typos                                                # 拼写检查
 cd ../git-pincer && cargo run --example playground   # 生成 /tmp/git-pincer-playground
 ```
 
-提交遵循 Conventional Commits（无钩子/CI 强制，只供 git-cliff 生成 changelog；**含中文的提交消息会被 cliff.toml 跳过**，不进 release notes）；pre-commit 钩子（`pre-commit install`）会跑 fmt / deny / typos / svelte-check / check / clippy / test 全套（cargo 类钩子缺 `build/` 时会自动先 `pnpm build`）。
+提交遵循 Conventional Commits（无钩子/CI 强制，只供 git-cliff 生成 changelog；**含中文的提交消息会被 cliff.toml 跳过**，不进 release notes）；pre-commit 钩子（`pre-commit install`）会跑 fmt / deny / typos / svelte-check / vitest / check / clippy / test 全套（cargo 类钩子缺 `build/` 时会自动先 `pnpm build`）。
 
 ## 架构: 计算在 Rust, 交互状态在前端
 
@@ -74,5 +75,5 @@ git 二进制 (继承用户 credentials/hooks/rerere 配置)
 - 工具链 1.96.0 锁定于 `rust-toolchain.toml`；edition 2024 与 rust-version 声明在 `src-tauri/Cargo.toml`。lint 已开 `unwrap_used` / `expect_used` / `panic` / `dbg_macro` / `missing_docs` / `unsafe_code` 警告，clippy CI 用 `-D warnings`——公共项必须写文档注释，禁用 `.unwrap()`（测试除外）。
 - 前端是纯 SPA：`ssr = false` + adapter-static（fallback index.html），**禁止** server load / `+server.ts` 等服务端能力；`src-tauri/**` 不在 vite watch 内（改 Rust 不触发前端 HMR）。
 - 主题 tokens 集中在 `src/lib/theme.css`（`--d-*` 变量，IDEA New UI 暗色）；PINCER 橙 `#ff7a2f` 仅用于 logo / 活动 tab 下划线 / 终端光标，不得挪作他用。
-- 无 UI 组件库、无 JS diff 库：样式手写 CSS，diff 全在 Rust；CM6 共用基建（主题/高亮/装饰/同步滚动）在 `src/lib/editor.ts`。新增依赖前先征求同意。
+- 无 UI 组件库、无 JS diff 库：样式手写 CSS，diff 全在 Rust；CM6 共用基建（主题/高亮/装饰/同步滚动）在 `src/lib/editor.ts`，纯 chunk 逻辑（无视图依赖）在 `src/lib/chunks.ts`。合理需要的新依赖可直接引入，无需逐项报批（2026-07-11 Zero 定）——但上述两条架构决定（不引 UI 组件库/JS diff 库）仍然有效。
 - UI 文案：大窗（Conflicts/三栏）用 IDEA 英文原文；小窗（打开页/菜单）的辅助文案用中文（说明行、终端 tab、状态栏、✔/✘ 尾行）。

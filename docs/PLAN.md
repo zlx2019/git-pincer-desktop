@@ -18,8 +18,8 @@
 
 **明确不做**
 
-- log / commit / push / 分支管理等冲突流程之外的 git 客户端功能;
-- CLI 的 `file` 单文件模式、i18n、配置系统 (v1 硬编码 IDEA Light 主题, 文案用 IDEA 英文原文);
+- log / commit / push 等冲突流程之外的 git 客户端功能 (例外, 2026-07-11 Zero 定: 菜单顶栏分支 chip 可切换本地分支, 服务于操作发起, 不再外扩);
+- CLI 的 `file` 单文件模式、i18n、配置系统 (硬编码全局 IDEA New UI **暗色**主题; 大窗文案用 IDEA 英文原文, 小窗辅助文案中文);
 - 键盘驱动的操作流 (仅保留 ⌘Z / ⌘⇧Z / ⌘⏎ / Esc 等常规编辑键)。
 
 ## 2. 架构: 计算在 Rust, 交互状态在前端
@@ -39,7 +39,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 **分工理由**
 
 - diff 放 Rust: `similar` 成熟且与 CLI 同库同参(Myers + 500ms deadline), 纯函数可单测, 免引 JS diff 依赖;
-- 交互状态留前端: 点击 / 悬停 / 撤销零 IPC 往返; CM6 RangeSet 随编辑自动 remap chunk 区间, "编辑↔区间"同步问题天然消失;
+- 交互状态留前端: 点击 / 悬停 / 撤销零 IPC 往返; 中栏 chunk 区间存前端 `resultRanges` 数组, 在 CM6 updateListener 里用 `changes.mapPos` 手动 remap(实现定稿, 非 RangeSet 自动映射);
 - 快照一次性下发(词级强调按 **UTF-16 偏移**, 与 CM6 文档坐标一致), 之后的 chunk 操作全部本地。
 
 **安全策略** (功能上借鉴 CLI, 独立实现): git 参数永远按数组传递不经 shell; continue 类命令注入 `GIT_EDITOR=true`; 清洗宿主 `GIT_DIR` 类环境变量防嵌套劫持。
@@ -55,13 +55,15 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `save_result(path, text)` | 写工作区文件 + `git add` (三栏 Apply / binary 选择共用) |
 | `continue_op()` | `git <op> --continue` 管道捕获, stdout/err 逐行发事件; 退出非零且仍有冲突 = 新一轮 (rebase), 否则报错 |
 | `abort_op()` | `git <op> --abort` (rebase 用 `--abort`, merge 用 `merge --abort`) |
-| `pick_dir() → path?` | tauri-plugin-dialog 目录选择器 |
-| `recent_repos() → path[]` | 最近打开列表 (tauri app-data 存 JSON) |
+| `recent_repos() → path[]` | 最近打开列表 (tauri app-data 存 JSON); 目录选择器由前端直接走 tauri-plugin-dialog, 不设专门命令 |
+| `recent_remove(path) → path[]` | 从最近列表移除一项, 返回过滤后列表 |
+| `switch_branch(name)` | `git switch`(菜单顶栏分支 chip, 仅无进行中操作时可用) |
 | `launch_op(kind, targets[]) → LaunchOutcome` | 菜单发起五操作; 输出走 `git://output`; 结束探测: 有冲突 → `Conflicts{files}`, 零退出 → `CleanDone`, 否则 `Failed`; 注入 `GIT_TERMINAL_PROMPT=0` 防无终端挂起 |
 | `branches() → Branch[]` | 本地分支(带当前标记), merge/rebase 对话框数据 |
 | `commits(others_only, limit) → CommitInfo[]` | 最近提交; others_only 只列当前分支未包含的(cherry-pick 场景) |
 
-事件: `git://output {stream, line}` (continue 输出流) · `git://round {files}` (新一轮冲突) · `git://done`。
+事件只有一个: `git://output {stream, line}` (launch/continue 的输出流, 发起前订阅、结束即退订)。
+结局不走事件——launch/continue 的结果由命令返回值带回 (`LaunchOutcome` / `RoundOutcome`, `tag="kind"` 的 tagged union); 旧方案的 `git://round` / `git://done` 未实现也不再计划。
 错误统一 `thiserror` 定义 + serde 序列化, 前端 toast 呈现。
 
 ## 4. 合并引擎 (`src-tauri/src/merge.rs`, 纯函数, 已实现)
@@ -129,12 +131,12 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 
 | 组件 | 要点 |
 |---|---|
-| 三个 CM6 实例 | 侧栏只读; 关软换行 (行高恒定简化几何); 行号; 语法高亮按扩展名加载语言包, 自写 IDEA Light HighlightStyle |
-| chunk 底色 | `Decoration.line` RangeSet, 随编辑自动 remap |
-| 接缝条 ×2 | ~28px 竖条内嵌 SVG: 每个可见 chunk 画 侧栏区间→Result区间 贝塞尔封闭带 (同底色); ✕ / ≫ / ≪ 按钮浮于其上; 滚动/编辑 rAF 节流重绘; y 坐标取自 `lineBlockAt` |
+| 三个 CM6 实例 | 侧栏只读; 关软换行 (行高恒定简化几何); 行号; 语法高亮按扩展名加载语言包, 自写 IDEA Dark HighlightStyle |
+| chunk 底色 | `Decoration.line`; 中栏区间在前端 `resultRanges` 手动 remap(`changes.mapPos`), 装饰经 Compartment 重建——侧栏按类名签名跳过未变栏, 手工打字只重建中栏 |
+| 接缝条 ×2 | **44px**(2026-07-11 定稿, 原 ~28px)竖条内嵌 SVG: 每个可见 chunk 画 侧栏区间→Result区间 贝塞尔封闭带 (同底色, 控制点在两端 30% 处成 IDEA 斜扫); ✕ / ≫ / ≪ 按钮浮于其上; 滚动/编辑 rAF 节流重绘; y 坐标取自 `lineBlockAt`; 按中栏 viewport 粗筛, 屏外 chunk 不算不画 |
 | gutter 按钮 | 左栏块 `✕ ≫`、右栏块 `≪ ✕` 镜像; hover 显示 tooltip; applied 后变 undo 图标 |
 | 同步滚动 | 以 chunk 三栏区间起始行为锚点分段线性插值 × 行高; 标记驱动源防回声 |
-| overview ruler | 最左/最右 ~10px: 全文 chunk 色块缩略 + 视口框, 点击跳转 |
+| overview ruler | 最右 ~12px: 全文 chunk 色块缩略(实时区间换算, 编辑后不漂移), 点击按滚动高度比例跳转 |
 | 顶栏 | ↑↓ 上/下一个 change (自动滚三栏); ⋙ 组 = 批量应用非冲突 (Left/All/Right); Highlight words ▾ = words/none 切换 |
 | 底栏 | Accept Left/Right = 整文件取侧; Cancel = 放弃本文件改动回列表; **Apply** = Result 全文 `save_result` 后回列表刷新 |
 
@@ -144,23 +146,23 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 
 ## 6. 主题 tokens (全局统一 IDEA New UI 暗色, 2026-07-10 定稿)
 
-`src/lib/theme.css` 集中 CSS 变量(--d-* 系列): 画布 `#1e1f22` · 面板 `#2b2d30` · 分隔线 `#393b40`/`#43454a` · 文本 `#dfe1e5` / 弱化 `#9da0a8` · IDEA 蓝 `#3574f0`(主按钮) · 选中 `#2e436e` · 绿 `#5fad65` · 红 `#e46962` · 琥珀 `#d9a343` · **PINCER 橙 `#ff7a2f`(仅 logo / 活动 tab 下划线 / 终端光标)** + §5.2 四个 chunk 暗色。等宽字体 JetBrains Mono (OFL 内嵌), UI 字体系统栈。
+`src/lib/theme.css` 集中 CSS 变量(--d-* 系列): 画布 `#1e1f22` · 面板 `#2b2d30` · 分隔线 `#393b40`/`#43454a` · 文本 `#dfe1e5` / 弱化 `#9da0a8` · IDEA 蓝 `#3574f0`(主按钮) · 选中 `#2e436e` · 绿 `#5fad65` · 红 `#e46962` · 琥珀 `#d9a343`("进行中"语义色, 如菜单状态栏) · **PINCER 橙 `#ff7a2f`(仅 logo / 活动 tab 下划线 / 终端光标)** + §5.2 四个 chunk 暗色。等宽字体 JetBrains Mono Regular (OFL 内嵌于 `static/fonts/`, 2026-07-11 落地), UI 字体系统栈。
 
 ## 7. 里程碑 (不含任何 git-pincer 仓库改动)
 
 | # | 内容 | 验收 |
 |---|---|---|
 | M1 | Rust 壳 9 命令 + 打开仓库 + Conflicts 列表页完整 (Accept/多选/分组/删除冲突/binary 对话框) | 对照图 1; playground 仓库 merge 场景 |
-| M2 | 合并引擎 (worker) + 三栏只读: 着色/词级/行号/语法高亮/同步滚动/ruler | 对照图 2 静态形态 |
+| M2 | 合并引擎 (Rust, merge.rs) + 三栏只读: 着色/词级/行号/语法高亮/同步滚动/ruler | 对照图 2 静态形态 |
 | M3 | 全部交互: gutter/接缝/apply/ignore/undo/apply-all/自由编辑/计数/Apply&Cancel | 单文件 merge 闭环 |
-| M4 | Continue 事件流 + 多轮 rebase + abort + 完成页 | playground 六场景全通 |
-| M5 | 像素校准 (与截图对比)、打包 (dmg/nsis/AppImage) + GitHub Actions | 三平台产物可装 |
+| M4 | Continue 事件流 + 多轮 rebase + abort (结局统一回菜单终端留痕, 无单独完成页) | playground 六场景全通 |
+| M5 | 像素校准 (与截图对比)、打包 (dmg / nsis+msi / AppImage+deb+rpm) + GitHub Actions | 四平台矩阵产物可装 |
 
 测试数据借用 git-pincer 的 `cargo run --example playground` 生成 /tmp/git-pincer-playground (只造数据, 非代码依赖); 引擎的分组/降级逻辑用 Rust 单测(merge.rs 模块尾)。
 
 **进度 (2026-07-10)**: M1–M4 全部完成(菜单化 + 暗色小窗/大窗切换 + 三栏全交互 + continue 循环); M5 的打包配置/图标/CI(ci.yml + release.yml + cargo-deny)已就绪, **像素级校准依赖 Zero 的截图反馈持续进行**。快捷键: 合并页 F7/⇧F7 导航、⌘⏎ Apply、Esc 返回、Highlight words 开关; 菜单页 ⌘1–⌘5。
 
-## 8. 新增依赖 (待批准, 装前逐项确认)
+## 8. 依赖清单 (2026-07-11 Zero 定: 合理需要的新依赖可直接引入, 不再逐项报批)
 
 | 侧 | 依赖 | 用途 |
 |---|---|---|
@@ -168,12 +170,13 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 | Rust | `thiserror = "2"` | 壳层错误类型 |
 | Rust | `similar = "3.1"` | 合并引擎行/字符级 diff(与 CLI 同库) |
 | npm | `@codemirror/state` `view` `language` `language-data` + `@lezer/highlight` | 三栏编辑器; 语言包经 language-data 按需动态加载 |
-| npm | 无 UI 组件库、无 JS diff 库 | 1:1 手写 CSS; diff 全在 Rust |
+| npm | `vitest` (dev) | 前端纯逻辑单测(`src/lib/chunks.ts`) |
+| npm | 无 UI 组件库、无 JS diff 库 | 1:1 手写 CSS; diff 全在 Rust(架构决定, 保持有效) |
 
 ## 9. 风险
 
-- JS diff 性能上限 → Web Worker + >2MB/300ms 降级守护兜底;
-- 接缝 SVG 与滚动帧同步 → rAF 节流, 兜底直角折线;
+- 超大输入/病态 diff → Rust 侧 500ms deadline + 任一侧 >2MB 整文件降级守护兜底(词级强调另设 200 行 / 1000 字符上限);
+- 接缝 SVG 与滚动帧同步 → rAF 节流 + viewport 粗筛, 兜底直角折线;
 - webkit2gtk (Linux) 字体度量差异 → M5 专项校准;
 - 删除-修改、双添加等边角 stage 组合 → M1 用 playground 全场景覆盖。
 
