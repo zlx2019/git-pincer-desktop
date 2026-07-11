@@ -6,6 +6,8 @@
     id: string;
     label: string;
     sublabel?: string;
+    /** 附加小标签(如提交的来源分支), 以描边 chip 呈现 */
+    tag?: string;
     disabled?: boolean;
   }
 
@@ -64,6 +66,7 @@
             ondblclick={() => dblclickItem(item)}
           >
             <span class="label">{item.label}</span>
+            {#if item.tag}<span class="tag mono">{item.tag}</span>{/if}
             {#if item.sublabel}<span class="sub dim mono">{item.sublabel}</span>{/if}
           </button>
         {/each}
@@ -173,6 +176,20 @@
   .item .sub {
     font-size: 11px;
     flex: none;
+  }
+
+  .item .tag {
+    flex: none;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+    line-height: 15px;
+    color: var(--d-dim);
+    border: 1px solid var(--d-border-strong);
+    border-radius: 4px;
+    padding: 0 5px;
   }
 
   footer {

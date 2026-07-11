@@ -3,21 +3,21 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { SvelteSet } from 'svelte/reactivity';
-  import { confirm } from '@tauri-apps/plugin-dialog';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, opTitleSegments, type FileRow, type OutputLine } from '$lib/api';
   import { largeWindow } from '$lib/win';
-  import { session } from '$lib/state.svelte';
+  import { session, term } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import BinaryDialog from '$lib/components/BinaryDialog.svelte';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   const selected = new SvelteSet<string>();
   let lastIndex = -1;
   let groupByDir = $state(false);
   let binaryPath: string | null = $state(null);
+  let abortAsk = $state(false);
   let round = $state(1);
   let running = $state(false);
-  let doneBanner = $state(false);
   let outputLines = $state<OutputLine[]>([]);
   let consoleEl: HTMLElement | undefined = $state();
 
@@ -51,8 +51,8 @@
         selected.clear();
         lastIndex = -1;
       }
-      // 新一轮操作开始 → 清掉上次的完成横幅
-      if (info.op) doneBanner = false;
+      // 操作已不在(在外部完成/中止): 列表页失去意义, 回菜单小窗
+      if (!info.op) goto('/menu');
     } catch (e) {
       toast(String(e));
     }
@@ -147,16 +147,22 @@
     lastIndex = -1;
   }
 
-  /** 驱动 --continue: 输出走事件流, 结果分 完成/下一轮/失败 */
+  /** 驱动 --continue: 输出走事件流, 结果分 完成/下一轮/失败; 完成详情交给菜单终端 */
   async function doContinue() {
     running = true;
     outputLines = [];
+    const op = session.info?.op;
     const unlisten = await api.onOutput((l) => outputLines.push(l));
     try {
       const outcome = await api.continueOp();
       if (outcome.kind === 'done') {
         session.info = await api.repoOpen();
-        doneBanner = true;
+        term.entries.push({ kind: 'cmd', text: `git ${op} --continue` });
+        for (const l of outputLines) {
+          term.entries.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line });
+        }
+        term.entries.push({ kind: 'ok', text: `✔ ${op} completed` });
+        goto('/menu');
       } else if (outcome.kind === 'nextRound') {
         round += 1;
         session.files = outcome.files;
@@ -172,19 +178,19 @@
     }
   }
 
-  /** 中止操作(确认后) */
+  /** 中止操作(应用内对话框确认后执行): 结局写入菜单终端, 回菜单小窗 */
   async function doAbort() {
-    const info = session.info;
-    if (!info?.op) return;
-    const ok = await confirm(
-      `Abort the ${info.op}? All conflict resolutions in this operation will be lost.`,
-      { title: 'Abort', kind: 'warning' }
-    );
-    if (!ok) return;
+    abortAsk = false;
+    const op = session.info?.op;
     try {
       await api.abortOp();
       session.info = await api.repoOpen();
       session.files = [];
+      if (op) {
+        term.entries.push({ kind: 'cmd', text: `git ${op} --abort` });
+        term.entries.push({ kind: 'ok', text: `✔ ${op} aborted` });
+      }
+      goto('/menu');
     } catch (e) {
       toast(String(e));
     }
@@ -222,24 +228,12 @@
     </header>
 
     {#if !info.op}
+      <!-- 兜底: 正常路径下 reprobe/abort/continue 都会直接回菜单, 这里只在竞态瞬间可见 -->
       <div class="panel">
-        <h2>{doneBanner ? 'Operation completed successfully' : 'No merge operation in progress'}</h2>
+        <h2>No merge operation in progress</h2>
         <p class="dim mono">{info.root}</p>
-        {#if !doneBanner}
-          <p class="dim guide">
-            Start a merge, rebase, cherry-pick or revert in this repository from your terminal or
-            IDE. Conflicts appear here automatically when you come back to this window.
-          </p>
-          <p class="dim mono example">e.g. git merge &lt;branch&gt;</p>
-        {/if}
-        {#if outputLines.length}
-          <pre class="console mono" bind:this={consoleEl}>{#each outputLines as l, i (i)}<span
-                class={l.stream}>{l.line}
-</span>{/each}</pre>
-        {/if}
         <div class="row-buttons">
-          <button onclick={() => goto('/menu')}>Close</button>
-          <button class="primary" onclick={reprobe}>Refresh</button>
+          <button class="primary" onclick={() => goto('/menu')}>Close</button>
         </div>
       </div>
     {:else if session.files.length === 0}
@@ -252,7 +246,7 @@
 </span>{/each}</pre>
         {/if}
         <div class="row-buttons">
-          <button disabled={running} onclick={doAbort}>Abort</button>
+          <button disabled={running} onclick={() => (abortAsk = true)}>Abort</button>
           <button class="primary" disabled={running} onclick={doContinue}>
             {running ? 'Running…' : `Continue (git ${info.op} --continue)`}
           </button>
@@ -316,7 +310,7 @@
       <footer>
         <label><input type="checkbox" bind:checked={groupByDir} /> Group files by directory</label>
         <span class="spacer"></span>
-        <button onclick={doAbort}>Abort</button>
+        <button onclick={() => (abortAsk = true)}>Abort</button>
         <button onclick={() => goto('/menu')}>Close</button>
       </footer>
     {/if}
@@ -331,6 +325,17 @@
       binaryPath = null;
       await refresh();
     }}
+  />
+{/if}
+
+{#if abortAsk && session.info?.op}
+  <ConfirmDialog
+    title="Abort"
+    message={`Abort the ${session.info.op}? All conflict resolutions in this operation will be lost.`}
+    confirmLabel="Abort"
+    danger
+    onconfirm={doAbort}
+    onclose={() => (abortAsk = false)}
   />
 {/if}
 
@@ -476,18 +481,6 @@
     display: flex;
     gap: 10px;
     margin-top: 8px;
-  }
-
-  .guide {
-    max-width: 460px;
-    text-align: center;
-    line-height: 1.5;
-    margin: 2px 0 0;
-  }
-
-  .example {
-    font-size: 12px;
-    margin: 0;
   }
 
 </style>

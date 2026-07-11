@@ -5,7 +5,7 @@
   import { goto } from '$app/navigation';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, type LaunchKind, type OutputLine } from '$lib/api';
-  import { session } from '$lib/state.svelte';
+  import { session, term } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
   import PickerDialog from '$lib/components/PickerDialog.svelte';
@@ -19,12 +19,10 @@
     order: string[];
   }
 
-  /** 终端条目: 命令回显 / 标准输出 / 错误输出 / 成功尾行 / 失败尾行 */
-  type TermEntry = { kind: 'cmd' | 'out' | 'err' | 'ok' | 'fail'; text: string };
-
   let running: LaunchKind | null = $state(null);
   let dialog: DialogSpec | null = $state(null);
-  let entries = $state<TermEntry[]>([]);
+  let switchItems: { id: string; label: string; sublabel?: string; disabled?: boolean }[] | null =
+    $state(null);
   let termEl: HTMLElement | undefined = $state();
 
   // 图标为静态字面量, {@html} 安全
@@ -101,9 +99,39 @@
     }
   }
 
+  /** 打开分支切换对话框(当前分支置顶且置灰) */
+  async function askSwitch() {
+    if (running || dialog) return;
+    try {
+      const bs = (await api.branches()).sort((a, b) => Number(b.current) - Number(a.current));
+      switchItems = bs.map((b) => ({
+        id: b.name,
+        label: b.name,
+        sublabel: b.current ? 'current' : undefined,
+        disabled: b.current,
+      }));
+    } catch (e) {
+      toast(String(e));
+    }
+  }
+
+  /** 执行切换: 回执进终端, 失败原样透出 git 的说明(如工作区有未提交改动) */
+  async function doSwitch(ids: string[]) {
+    const name = ids[0];
+    switchItems = null;
+    term.entries.push({ kind: 'cmd', text: `git switch ${name}` });
+    try {
+      await api.switchBranch(name);
+      session.info = await api.repoOpen();
+      term.entries.push({ kind: 'ok', text: `✔ switched to ${name}` });
+    } catch (e) {
+      term.entries.push({ kind: 'fail', text: `✘ ${String(e)}` });
+    }
+  }
+
   /** ⌘/Ctrl + 1..5 触发对应操作 */
   function hotkey(e: KeyboardEvent) {
-    if (!(e.metaKey || e.ctrlKey) || dialog || running) return;
+    if (!(e.metaKey || e.ctrlKey) || dialog || switchItems || running) return;
     const idx = ['1', '2', '3', '4', '5'].indexOf(e.key);
     if (idx >= 0) {
       e.preventDefault();
@@ -119,7 +147,8 @@
       if (kind === 'pull') {
         await run(kind, []);
       } else if (kind === 'merge' || kind === 'rebase') {
-        const bs = await api.branches();
+        // 当前分支置顶(IDEA 习惯), 其余保持 git 的字母序
+        const bs = (await api.branches()).sort((a, b) => Number(b.current) - Number(a.current));
         dialog = {
           kind,
           multi: false,
@@ -140,7 +169,12 @@
           multi: true,
           confirm: kind === 'cherry-pick' ? 'Cherry-pick' : 'Revert',
           title: kind === 'cherry-pick' ? '摘取提交(可多选)' : '撤销提交(可多选)',
-          items: cs.map((c) => ({ id: c.sha, label: c.subject, sublabel: c.sha })),
+          items: cs.map((c) => ({
+            id: c.sha,
+            label: c.subject,
+            sublabel: c.sha,
+            tag: c.branch || undefined,
+          })),
           order: cs.map((c) => c.sha),
         };
       }
@@ -163,10 +197,10 @@
   /** 执行操作: 命令回显 + 输出流入终端; 出冲突 → 大窗冲突页, 结束打尾行 */
   async function run(kind: LaunchKind, targets: string[]) {
     running = kind;
-    entries.push({ kind: 'cmd', text: ['git', kind, ...targets].join(' ') });
+    term.entries.push({ kind: 'cmd', text: ['git', kind, ...targets].join(' ') });
     const started = Date.now();
     const unlisten = await api.onOutput((l: OutputLine) =>
-      entries.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line })
+      term.entries.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line })
     );
     try {
       const outcome = await api.launchOp(kind, targets);
@@ -176,12 +210,12 @@
         await goto('/conflicts');
       } else if (outcome.kind === 'cleanDone') {
         const secs = ((Date.now() - started) / 1000).toFixed(1);
-        entries.push({ kind: 'ok', text: `✔ 完成 · 用时 ${secs}s` });
+        term.entries.push({ kind: 'ok', text: `✔ 完成 · 用时 ${secs}s` });
       } else {
-        entries.push({ kind: 'fail', text: `✘ ${outcome.message}` });
+        term.entries.push({ kind: 'fail', text: `✘ ${outcome.message}` });
       }
     } catch (e) {
-      entries.push({ kind: 'fail', text: `✘ ${String(e)}` });
+      term.entries.push({ kind: 'fail', text: `✘ ${String(e)}` });
     } finally {
       unlisten();
       running = null;
@@ -190,7 +224,7 @@
 
   // 终端自动滚到底
   $effect(() => {
-    void entries.length;
+    void term.entries.length;
     if (termEl) termEl.scrollTop = termEl.scrollHeight;
   });
 
@@ -212,14 +246,17 @@
         </svg>
         {basename(info.root)}
       </span>
-      <span class="chip">
+      <button class="chip" title="Switch branch" disabled={running !== null} onclick={askSwitch}>
         <svg class="bicon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <circle cx="4.5" cy="3.5" r="1.6" /><circle cx="4.5" cy="12.5" r="1.6" /><circle cx="11.5" cy="6" r="1.6" />
           <path d="M4.5 5.1v5.8M11.5 7.6c0 2.4-4 1.6-6 2.6" />
         </svg>
         <span class="mono">{info.yoursLabel}</span>
         {#if info.dirty > 0}<span class="dirty">✚{info.dirty}</span>{/if}
-      </span>
+        <svg class="caret" viewBox="0 0 16 16" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m4 6 4 4 4-4" />
+        </svg>
+      </button>
       <button class="iconbtn" title="Switch repository" onclick={() => goto('/')}>
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M1.5 4.5a1 1 0 0 1 1-1h3l1.5 1.8h6.5a1 1 0 0 1 1 1v1.2M3.5 13.5l1.6-5h9.9l-1.6 5z" />
@@ -256,18 +293,18 @@
         </button>
       {/each}
 
-      {#if entries.length}
+      {#if term.entries.length}
         <div class="term">
           <div class="tabs">
             <span class="tab active">执行输出</span>
-            <button class="iconbtn" title="Clear output" onclick={() => (entries = [])}>
+            <button class="iconbtn" title="Clear output" onclick={() => (term.entries = [])}>
               <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M2.5 4h11M5.5 4V2.8a.8.8 0 0 1 .8-.8h3.4a.8.8 0 0 1 .8.8V4M4 4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4" />
               </svg>
             </button>
           </div>
           <div class="tlog mono" bind:this={termEl}>
-            {#each entries as en, i (i)}
+            {#each term.entries as en, i (i)}
               {#if en.kind === 'cmd'}
                 <span class="ln"><span class="pr">➜</span> <span class="cmd">{en.text}</span></span>
               {:else}
@@ -308,6 +345,16 @@
     confirmLabel={dialog.confirm}
     onconfirm={confirmDialog}
     onclose={() => (dialog = null)}
+  />
+{/if}
+
+{#if switchItems}
+  <PickerDialog
+    title="切换分支"
+    items={switchItems}
+    confirmLabel="Switch"
+    onconfirm={doSwitch}
+    onclose={() => (switchItems = null)}
   />
 {/if}
 
@@ -353,6 +400,16 @@
 
   .chip .bicon {
     color: var(--d-blue);
+  }
+
+  /* 分支 chip 是按钮(点击切换分支): 抵消全局 button 的固定高度 */
+  button.chip {
+    height: auto;
+    text-align: left;
+  }
+
+  .chip .caret {
+    margin-left: 1px;
   }
 
   .dirty {

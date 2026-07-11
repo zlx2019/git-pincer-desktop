@@ -1,6 +1,13 @@
 // CM6 三栏渲染基建: IDEA Dark 主题、语法高亮、chunk 装饰、锚点同步滚动
-import { EditorState, RangeSetBuilder, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, lineNumbers, type DecorationSet } from '@codemirror/view';
+import { EditorState, RangeSetBuilder, type Extension, type RangeSet } from '@codemirror/state';
+import {
+  Decoration,
+  EditorView,
+  GutterMarker,
+  gutterLineClass,
+  lineNumbers,
+  type DecorationSet,
+} from '@codemirror/view';
 import { HighlightStyle, LanguageDescription, syntaxHighlighting } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import { tags as t } from '@lezer/highlight';
@@ -26,11 +33,11 @@ export const ideaTheme = EditorView.theme(
       scrollbarWidth: 'none',
     },
     '.cm-scroller::-webkit-scrollbar': { display: 'none' },
+    // 行号槽不设竖分隔线: chunk 行的槽位与内容同色(gutterLineClass), 色带得以穿过行号列(IDEA 行为)
     '.cm-gutters': {
       backgroundColor: 'var(--d-canvas)',
       color: '#6e7178',
       border: 'none',
-      borderRight: '1px solid var(--d-border)',
     },
     '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 12px' },
     '&.cm-focused': { outline: 'none' },
@@ -81,16 +88,41 @@ export function lineRangeToPos(
   return { from, to };
 }
 
-/** 构建 chunk 行底色与词级强调装饰; classFor 决定每个 chunk 的类名(null = 不着色) */
+/** 行号槽底色标记(复用 chunk 类名, 让色带视觉上穿过行号列) */
+class GutterLineMarker extends GutterMarker {
+  constructor(cls: string) {
+    super();
+    this.elementClass = cls;
+  }
+
+  override eq(other: GutterLineMarker): boolean {
+    return other.elementClass === this.elementClass;
+  }
+}
+
+const gutterMarkers = new Map<string, GutterLineMarker>();
+
+/** 同类名标记实例复用(RangeSet eq 友好) */
+function markerFor(cls: string): GutterLineMarker {
+  let m = gutterMarkers.get(cls);
+  if (!m) {
+    m = new GutterLineMarker(cls);
+    gutterMarkers.set(cls, m);
+  }
+  return m;
+}
+
+/** 构建 chunk 行底色、词级强调与行号槽底色; classFor 决定每个 chunk 的类名(null = 不着色) */
 export function buildPaneDecos(
   doc: EditorState['doc'],
   chunks: MergeChunk[],
   pane: Pane,
   classFor: (c: MergeChunk) => string | null,
   resultRanges?: { from: number; to: number }[]
-): [DecorationSet, DecorationSet] {
+): [DecorationSet, DecorationSet, RangeSet<GutterMarker>] {
   const lineB = new RangeSetBuilder<Decoration>();
   const markB = new RangeSetBuilder<Decoration>();
+  const gutterB = new RangeSetBuilder<GutterMarker>();
   for (const c of chunks) {
     const cls = classFor(c);
     if (!cls) continue;
@@ -104,9 +136,12 @@ export function buildPaneDecos(
       if (!range) continue;
       ({ from, to } = lineRangeToPos(doc, range));
     }
+    // 行号槽只取基础类(去掉 ck-cur 之类的附加态, 避免槽位重复描边)
+    const gutterCls = cls.split(' ')[0];
     for (let pos = from; pos < to && pos < doc.length; ) {
       const line = doc.lineAt(pos);
       lineB.add(line.from, line.from, Decoration.line({ class: cls }));
+      gutterB.add(line.from, line.from, markerFor(gutterCls));
       pos = line.to + 1;
     }
     if (pane === 'result') continue;
@@ -122,7 +157,7 @@ export function buildPaneDecos(
       if (mt > mf) markB.add(mf, mt, Decoration.mark({ class: 'ck-em' }));
     }
   }
-  return [lineB.finish(), markB.finish()];
+  return [lineB.finish(), markB.finish(), gutterB.finish()];
 }
 
 /** 创建 pane(扩展由调用方组合) */

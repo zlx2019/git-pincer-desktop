@@ -4,15 +4,15 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { confirm } from '@tauri-apps/plugin-dialog';
   import { Annotation, Compartment, Transaction, type Extension } from '@codemirror/state';
-  import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+  import { EditorView, gutterLineClass, keymap, lineNumbers } from '@codemirror/view';
   import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
   import { syntaxHighlighting } from '@codemirror/language';
   import { api, type MergeChunk, type MergeSnapshot } from '$lib/api';
   import { session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { largeWindow } from '$lib/win';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import {
     buildPaneDecos,
     createPane,
@@ -39,12 +39,25 @@
     state: ChunkState;
   }
 
-  const SEAM = 34;
+  const SEAM = 44;
   /// chunk 操作事务标记: 与手工编辑区分, 且不进 CM6 历史(有独立撤销栈)
   const chunkOp = Annotation.define<boolean>();
 
+  // 接缝按钮图标(静态字面量, {@html} 安全); 线条风格与菜单页图标一致, 对齐 IDEA 的细线灰色 glyph
+  const IC = {
+    applyL:
+      '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5 7.5 8 4 11.5M8.5 4.5 12 8l-3.5 3.5"/></svg>',
+    applyR:
+      '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 8.5 8l3.5 3.5M7.5 4.5 4 8l3.5 3.5"/></svg>',
+    ignore:
+      '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></svg>',
+    revert:
+      '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5v4h4"/><path d="M3.8 7.2a4.9 4.9 0 1 0 1.1-3"/></svg>',
+  };
+
   let snap: MergeSnapshot | null = $state(null);
   let showWords = $state(true);
+  let applyAsk = $state(false);
   let states = $state<ChunkState[]>([]);
   let resultRanges = $state<{ from: number; to: number }[]>([]);
   let undoStack = $state<UndoEntry[]>([]);
@@ -103,6 +116,12 @@
     views[1]?.scrollDOM.scrollBy({ top: e.deltaY });
   }
 
+  /// CM6 的行高测量是异步的(初次布局/字体就绪后才准), 几何变化时必须触发接缝重绘,
+  /// 否则按初始估算行高算出的按钮/色带位置会随行号累积偏移
+  const geoTick = EditorView.updateListener.of((u) => {
+    if (u.geometryChanged) bumpTick();
+  });
+
   /** 拉取快照并构建三栏 */
   async function load() {
     try {
@@ -116,8 +135,12 @@
       await new Promise((r) => requestAnimationFrame(r));
       if (!leftEl || !resultEl || !rightEl) return;
 
-      const left = createPane(leftEl, s.left, [...readonlyExtensions(lang), leftComp.of([])]);
-      const right = createPane(rightEl, s.right, [...readonlyExtensions(lang), rightComp.of([])]);
+      const left = createPane(leftEl, s.left, [...readonlyExtensions(lang), geoTick, leftComp.of([])]);
+      const right = createPane(rightEl, s.right, [
+        ...readonlyExtensions(lang),
+        geoTick,
+        rightComp.of([]),
+      ]);
       const result = createPane(resultEl, s.result, centerExtensions(lang));
       views = [left, result, right];
       resultRanges = s.chunks.map((c) => lineRangeToPos(result.state.doc, c.resultRange));
@@ -144,6 +167,7 @@
       ideaTheme,
       syntaxHighlighting(ideaHighlight, { fallback: true }),
       lang,
+      geoTick,
       centerComp.of([]),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) {
@@ -228,14 +252,18 @@
     const [lv, cv, rv] = views;
     if (!lv || !cv || !rv) return;
     const mk = (v: EditorView, pane: Pane, cls: (c: MergeChunk) => string | null) => {
-      const [lines, marks] = buildPaneDecos(
+      const [lines, marks, gutters] = buildPaneDecos(
         v.state.doc,
         snap!.chunks,
         pane,
         cls,
         pane === 'result' ? resultRanges : undefined
       );
-      return [EditorView.decorations.of(lines), EditorView.decorations.of(marks)];
+      return [
+        EditorView.decorations.of(lines),
+        EditorView.decorations.of(marks),
+        gutterLineClass.of(gutters),
+      ];
     };
     lv.dispatch({ effects: leftComp.reconfigure(mk(lv, 'left', leftClass)) });
     cv.dispatch({ effects: centerComp.reconfigure(mk(cv, 'result', centerClass)) });
@@ -355,15 +383,10 @@
     const open = ids.filter((i) => !resolved(i));
     const pool = open.length ? open : ids;
     if (!pool.length) return;
-    const pos = pool.findIndex((i) => (dir > 0 ? i > curIdx : i < curIdx));
     curIdx =
       dir > 0
-        ? pos >= 0
-          ? pool[pos]
-          : pool[0]
-        : pos >= 0
-          ? pool[pos]
-          : [...pool].reverse().find((i) => i < curIdx) ?? pool[pool.length - 1];
+        ? (pool.find((i) => i > curIdx) ?? pool[0])
+        : ([...pool].reverse().find((i) => i < curIdx) ?? pool[pool.length - 1]);
     const r = resultRanges[curIdx];
     views[1].dispatch({ effects: EditorView.scrollIntoView(r.from, { y: 'center' }) });
     scheduleDecos();
@@ -371,16 +394,20 @@
 
   // ── 落盘与离开 ───────────────────────────────────
 
-  /** Apply: 中栏全文写入并暂存, 回列表 */
+  /** Apply: 中栏全文写入并暂存, 回列表; 仍有冲突时先弹应用内确认 */
   async function saveApply() {
     if (!snap || !views[1]) return;
     if (conflictsLeft > 0) {
-      const ok = await confirm(`${conflictsLeft} conflict(s) still unresolved. Apply anyway?`, {
-        title: 'Apply',
-        kind: 'warning',
-      });
-      if (!ok) return;
+      applyAsk = true;
+      return;
     }
+    await save(views[1].state.doc.toString());
+  }
+
+  /** 确认后无视剩余冲突强制 Apply */
+  async function forceApply() {
+    applyAsk = false;
+    if (!snap || !views[1]) return;
     await save(views[1].state.doc.toString());
   }
 
@@ -403,9 +430,13 @@
 
   // ── 接缝几何 ─────────────────────────────────────
 
-  /** pos 在该视图视口内的 y 坐标 */
+  /** pos 在该 pane 视口内的 y 坐标; documentTop 已含滚动量与内容顶部内边距 */
   function posTop(v: EditorView, pos: number): number {
-    return v.lineBlockAt(Math.min(pos, v.state.doc.length)).top - v.scrollDOM.scrollTop;
+    return (
+      v.lineBlockAt(Math.min(pos, v.state.doc.length)).top +
+      v.documentTop -
+      v.scrollDOM.getBoundingClientRect().top
+    );
   }
 
   /** 行号(静态侧栏)对应的视口 y */
@@ -432,13 +463,15 @@
     return { ys1, ys2, yc1, yc2 };
   }
 
-  /** 接缝连接带路径(左缝: 侧→中, 右缝镜像) */
+  /** 接缝连接带路径(左缝: 侧→中, 右缝镜像)。
+      控制点放在两端 30% 处而非正中: 中段是匀坡近直线、只在进出口带圆角缓冲(IDEA 的斜扫观感),
+      避免坡度全部堆在中段把窄带挤成竖管 */
   function bandPath(g: { ys1: number; ys2: number; yc1: number; yc2: number }, seam: 'l' | 'r') {
     const [x0, x1] = seam === 'l' ? [0, SEAM] : [SEAM, 0];
-    const m = SEAM / 2;
+    const dx = (x1 - x0) * 0.3;
     return (
-      `M${x0} ${g.ys1} C${m} ${g.ys1} ${m} ${g.yc1} ${x1} ${g.yc1}` +
-      ` L${x1} ${g.yc2} C${m} ${g.yc2} ${m} ${g.ys2} ${x0} ${g.ys2} Z`
+      `M${x0} ${g.ys1} C${x0 + dx} ${g.ys1} ${x1 - dx} ${g.yc1} ${x1} ${g.yc1}` +
+      ` L${x1} ${g.yc2} C${x1 - dx} ${g.yc2} ${x0 + dx} ${g.ys2} ${x0} ${g.ys2} Z`
     );
   }
 
@@ -447,8 +480,9 @@
     return seam === 'l' ? 'ours' : 'theirs';
   }
 
-  /** 快捷键: F7/⇧F7 导航, ⌘/Ctrl+⏎ Apply, Esc 回列表(对齐 IDEA) */
+  /** 快捷键: F7/⇧F7 导航, ⌘/Ctrl+⏎ Apply, Esc 回列表(对齐 IDEA); 确认框打开时让位给对话框 */
   function hotkeys(e: KeyboardEvent) {
+    if (applyAsk) return;
     if (e.key === 'F7') {
       e.preventDefault();
       nav(e.shiftKey ? -1 : 1);
@@ -519,9 +553,9 @@
             {#if g}
               <path
                 d={bandPath(g, 'l')}
-                style="fill:var(--chunk-{c.visual});stroke:var(--chunk-{c.visual})"
-                fill-opacity={resolved(c.id) ? 0.08 : 0.3}
-                stroke-opacity="0.6"
+                class="bandp"
+                class:done={resolved(c.id)}
+                style="--band-color:var(--chunk-{c.visual})"
               />
             {/if}
           {/each}
@@ -531,10 +565,10 @@
           {#if g}
             <div class="gbtns" style="top:{g.ys1 + 1}px">
               {#if !states[c.id].edited && states[c.id][seamSide('l')] === 'pending'}
-                <button class="gb" title="Apply this change" onclick={() => applySide(c.id, 'ours')}>≫</button>
-                <button class="gb" title="Ignore" onclick={() => ignoreSide(c.id, 'ours')}>✕</button>
+                <button class="gb" title="Ignore" onclick={() => ignoreSide(c.id, 'ours')}>{@html IC.ignore}</button>
+                <button class="gb" title="Apply this change" onclick={() => applySide(c.id, 'ours')}>{@html IC.applyL}</button>
               {:else}
-                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(c.id)}>⟲</button>
+                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(c.id)}>{@html IC.revert}</button>
               {/if}
             </div>
           {/if}
@@ -550,9 +584,9 @@
             {#if g}
               <path
                 d={bandPath(g, 'r')}
-                style="fill:var(--chunk-{c.visual});stroke:var(--chunk-{c.visual})"
-                fill-opacity={resolved(c.id) ? 0.08 : 0.3}
-                stroke-opacity="0.6"
+                class="bandp"
+                class:done={resolved(c.id)}
+                style="--band-color:var(--chunk-{c.visual})"
               />
             {/if}
           {/each}
@@ -562,10 +596,10 @@
           {#if g}
             <div class="gbtns right" style="top:{g.ys1 + 1}px">
               {#if !states[c.id].edited && states[c.id][seamSide('r')] === 'pending'}
-                <button class="gb" title="Apply this change" onclick={() => applySide(c.id, 'theirs')}>≪</button>
-                <button class="gb" title="Ignore" onclick={() => ignoreSide(c.id, 'theirs')}>✕</button>
+                <button class="gb" title="Apply this change" onclick={() => applySide(c.id, 'theirs')}>{@html IC.applyR}</button>
+                <button class="gb" title="Ignore" onclick={() => ignoreSide(c.id, 'theirs')}>{@html IC.ignore}</button>
               {:else}
-                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(c.id)}>⟲</button>
+                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(c.id)}>{@html IC.revert}</button>
               {/if}
             </div>
           {/if}
@@ -599,6 +633,16 @@
     <div class="loading dim">Loading…</div>
   {/if}
 </div>
+
+{#if applyAsk}
+  <ConfirmDialog
+    title="Apply"
+    message={`${conflictsLeft} conflict${conflictsLeft === 1 ? '' : 's'} still unresolved. Apply anyway?`}
+    confirmLabel="Apply"
+    onconfirm={forceApply}
+    onclose={() => (applyAsk = false)}
+  />
+{/if}
 
 <style>
   .merge {
@@ -705,14 +749,14 @@
     overflow: hidden;
   }
 
+  /* 接缝不设竖边框: 色带与两侧行底色齐平衔接, 读作一个连续形状(IDEA 行为)。
+     宽度与脚本里的 SEAM 常量保持一致 */
   .seam {
-    width: 34px;
+    width: 44px;
     flex: none;
     position: relative;
     overflow: hidden;
     background: var(--d-canvas);
-    border-left: 1px solid var(--d-border);
-    border-right: 1px solid var(--d-border);
   }
 
   .band {
@@ -720,6 +764,15 @@
     inset: 0;
     height: 100%;
     pointer-events: none;
+  }
+
+  /* 连接带: 实心同 chunk 底色、无描边 → 与行底色连成漏斗形; 已解决降为极淡 */
+  .bandp {
+    fill: var(--band-color);
+  }
+
+  .bandp.done {
+    fill: rgba(255, 255, 255, 0.045);
   }
 
   .gbtns {
@@ -731,23 +784,22 @@
     gap: 2px;
   }
 
+  /* IDEA 风格: 无底色细线 glyph, 直接浮在连接带上, hover 才显浅色圆角底 */
   .gb {
     width: 15px;
     height: 15px;
     padding: 0;
     border: none;
     border-radius: 3px;
-    background: rgba(43, 45, 48, 0.85);
-    color: var(--d-blue-lt);
-    font-size: 11px;
-    line-height: 1;
+    background: transparent;
+    color: var(--d-dim);
     display: grid;
     place-items: center;
   }
 
   .gb:hover {
-    background: var(--d-sel);
-    color: #ffffff;
+    background: var(--d-hover);
+    color: var(--d-text);
   }
 
   .ruler {

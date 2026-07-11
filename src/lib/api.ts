@@ -33,6 +33,8 @@ export interface Branch {
 export interface CommitInfo {
   sha: string;
   subject: string;
+  /** 来源分支名(cherry-pick 场景; 当前分支历史为空串) */
+  branch: string;
 }
 
 /** chunk 来源侧 */
@@ -106,9 +108,11 @@ export const api = {
   continueOp: () => invoke<RoundOutcome>('continue_op'),
   abortOp: () => invoke<void>('abort_op'),
   recentRepos: () => invoke<string[]>('recent_repos'),
+  recentRemove: (path: string) => invoke<string[]>('recent_remove', { path }),
   launchOp: (kind: LaunchKind, targets: string[]) =>
     invoke<LaunchOutcome>('launch_op', { kind, targets }),
   branches: () => invoke<Branch[]>('branches'),
+  switchBranch: (name: string) => invoke<void>('switch_branch', { name }),
   commits: (othersOnly: boolean, limit = 30) =>
     invoke<CommitInfo[]>('commits', { othersOnly, limit }),
   /** 订阅 continue 的输出流 */

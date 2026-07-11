@@ -51,6 +51,15 @@
     }
   }
 
+  /** 从最近列表移除(只删记录, 不动仓库本身) */
+  async function removeRecent(path: string) {
+    try {
+      recent = await api.recentRemove(path);
+    } catch (e) {
+      toast(String(e));
+    }
+  }
+
   /** 路径末段作为展示名 */
   function basename(path: string): string {
     return path.split('/').filter(Boolean).pop() ?? path;
@@ -69,10 +78,15 @@
     <section class="recent">
       <h2>RECENT</h2>
       {#each recent as path (path)}
-        <button class="rrow" onclick={() => openRepo(path)}>
-          <span class="rname">{basename(path)}</span>
-          <span class="rpath mono">{path}</span>
-        </button>
+        <div class="rrow-wrap">
+          <button class="rrow" onclick={() => openRepo(path)}>
+            <span class="rname">{basename(path)}</span>
+            <span class="rpath mono">{path}</span>
+          </button>
+          <button class="rdel" title="Remove from recent" onclick={() => removeRecent(path)}>
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
+          </button>
+        </div>
       {/each}
     </section>
   {/if}
@@ -143,6 +157,10 @@
     margin: 0 6px 6px;
   }
 
+  .rrow-wrap {
+    position: relative;
+  }
+
   .rrow {
     display: flex;
     flex-direction: column;
@@ -150,7 +168,7 @@
     gap: 2px;
     width: 100%;
     height: auto;
-    padding: 6px 8px;
+    padding: 6px 28px 6px 8px;
     border: none;
     border-radius: 7px;
     background: transparent;
@@ -158,8 +176,39 @@
     text-align: left;
   }
 
-  .rrow:hover {
+  /* hover 提亮挂在包装层: 悬停删除键时行高亮不熄灭 */
+  .rrow-wrap:hover .rrow {
     background: var(--d-hover);
+  }
+
+  /* IDEA Welcome 页习惯: 删除键仅 hover/聚焦时浮现 */
+  .rdel {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--d-dim);
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rrow-wrap:hover .rdel,
+  .rdel:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .rdel:hover {
+    background: var(--d-sel);
+    color: var(--d-text);
   }
 
   .rname {
