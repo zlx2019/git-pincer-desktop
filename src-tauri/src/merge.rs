@@ -309,7 +309,12 @@ fn emphasis(
                 }
             }
         }
-        ChunkKind::Ours | ChunkKind::Agree => side_emphasis(base, ours, &mut left),
+        ChunkKind::Ours => side_emphasis(base, ours, &mut left),
+        ChunkKind::Agree => {
+            // 双方内容一致, 相对 base 的差异区间左右对称, 直接镜像
+            side_emphasis(base, ours, &mut left);
+            right = left.clone();
+        }
         ChunkKind::Theirs => side_emphasis(base, theirs, &mut right),
     }
     (left, right)
@@ -432,6 +437,9 @@ mod tests {
         assert_eq!(s.chunks.len(), 1);
         assert_eq!(s.chunks[0].kind, ChunkKind::Agree);
         assert_eq!(s.conflicts, 0);
+        // 双方内容一致 → 词级强调左右对称
+        assert!(!s.chunks[0].left_emphasis.is_empty());
+        assert_eq!(s.chunks[0].left_emphasis, s.chunks[0].right_emphasis);
     }
 
     #[test]
