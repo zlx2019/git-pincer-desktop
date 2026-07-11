@@ -68,6 +68,7 @@ git 二进制 (继承用户 credentials/hooks/rerere 配置)
 - **顺序不变量**: cherry-pick 对话框列表新→旧，确认后反转为**旧→新**逐个应用；revert 保持新→旧。
 - **路由即窗口形态** (`src/lib/win.ts`): `/`(打开页) 与 `/menu`(指令面板) 用紧凑小窗 420×640；`/conflicts` 与 `/merge` 切大窗 1280×800。跨页会话状态在 `src/lib/state.svelte.ts` 的 `session` ($state rune)——刷新即失，除打开页外所有路由 onMount 都守卫 `!session.info → goto('/')`（/menu 还会在 op 存在时转 /conflicts）。
 - **接管机制**: 无论操作在面板发起还是终端发起，窗口重获焦点会重探仓库状态，出现冲突即接管切大窗。
+- **托盘驻留** (lib.rs, tauri `tray-icon` feature): 关闭窗口被 `on_window_event` 拦截为隐藏，应用驻留系统托盘（菜单"显示窗口/退出"；Windows/Linux 左键单击唤回，macOS 左键弹菜单、点 Dock 图标经 `RunEvent::Reopen` 唤回）。隐藏不销毁 webview，session 状态原样保留；真正退出走托盘菜单。托盘全在 Rust 侧，无需 capabilities 白名单。
 - **能力白名单**: 前端调用的窗口/插件 API 必须列入 `src-tauri/capabilities/default.json`（现有 core/dialog/opener + window 的 set-size/set-min-size/center），否则运行时被拒。
 
 ## 约定
