@@ -36,9 +36,17 @@ expect_used = "warn"
 panic = "warn"
 dbg_macro = "warn"
 
+### Development profile
+# 依赖以 O2 编译(首次编译变慢, 但有缓存): similar 的 Myers 热循环在 dev 下
+# 走优化码路, `pnpm tauri dev` 的 diff/合并体验与 release 一致, 500ms deadline
+# 不再因 O0 依赖被大文件轻易击穿。本 crate 保持 O0, 增量编译与可调试性不受影响
+[profile.dev.package."*"]
+opt-level = 2
+
 ### Production packaging configuration
 [profile.release]
-lto = "thin"          # 链接时优化，提升运行性能
+lto = true            # 完整链接时优化(跨 crate 内联), 优于 thin; 仅发布构建付编译时间
 codegen-units = 1     # 单编译单元，优化更充分（编译更慢）
+opt-level = 3         # 速度优先(diff 引擎受益); 体积由 strip + lto 兜底
 strip = true          # 剥离调试符号，减小二进制体积
 
