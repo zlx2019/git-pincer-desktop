@@ -683,7 +683,8 @@
     color: var(--d-green);
   }
 
+  /* 琥珀承担"进行中"语义; PINCER 橙保持只在 logo / 活动 tab / 终端光标三处出现 */
   .sb-busy {
-    color: var(--d-orange);
+    color: var(--d-amber);
   }
 </style>
