@@ -2,10 +2,11 @@
   // 菜单指令面板(IDEA New UI 暗色小窗, 见 docs/IDEA_STYLE.md 与根目录 mockup):
   // 五操作对齐 CLI, ⌘1–⌘5 快捷键, 底部终端风执行输出; 出现冲突立刻接管切大窗
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { goto, preloadCode } from '$app/navigation';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, type LaunchKind, type OutputLine } from '$lib/api';
-  import { session, term } from '$lib/state.svelte';
+  import { rafBatcher } from '$lib/batch';
+  import { pushTerm, session, term, type TermEntry } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
   import PickerDialog from '$lib/components/PickerDialog.svelte';
@@ -75,6 +76,8 @@
       goto('/conflicts');
       return;
     }
+    // 冲突页代码预热: 出现冲突接管时不再现场拉取/解析模块
+    preloadCode('/conflicts').catch(() => {});
     // 终端里发起的操作也要能接管: 聚焦时重探
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -85,9 +88,15 @@
     return () => unlisten?.();
   });
 
+  // 聚焦重探限频: 进行中的不叠加, 800ms 冷却(点标题栏/快速切窗的连环焦点事件不再各起一串 git)
+  let probing = false;
+  let lastProbe = 0;
+
   /** 聚焦重探: 有操作进行中且未搁置则接管进冲突页; 搁置期间只刷新横幅数据 */
   async function reprobe() {
     if (running || !session.info) return;
+    if (probing || Date.now() - lastProbe < 800) return;
+    probing = true;
     try {
       const info = await api.repoOpen();
       session.info = info;
@@ -100,6 +109,9 @@
       if (!session.parked) goto('/conflicts');
     } catch (e) {
       toast(String(e));
+    } finally {
+      probing = false;
+      lastProbe = Date.now();
     }
   }
 
@@ -129,13 +141,13 @@
   async function doSwitch(ids: string[]) {
     const name = ids[0];
     switchItems = null;
-    term.entries.push({ kind: 'cmd', text: `git switch ${name}` });
+    pushTerm({ kind: 'cmd', text: `git switch ${name}` });
     try {
       await api.switchBranch(name);
       session.info = await api.repoOpen();
-      term.entries.push({ kind: 'ok', text: `✔ switched to ${name}` });
+      pushTerm({ kind: 'ok', text: `✔ switched to ${name}` });
     } catch (e) {
-      term.entries.push({ kind: 'fail', text: `✘ ${String(e)}` });
+      pushTerm({ kind: 'fail', text: `✘ ${String(e)}` });
     }
   }
 
@@ -205,28 +217,32 @@
     run(kind, targets);
   }
 
-  /** 执行操作: 命令回显 + 输出流入终端; 出冲突 → 大窗冲突页, 结束打尾行 */
+  /** 执行操作: 命令回显 + 输出流入终端(rAF 合帧); 出冲突 → 大窗冲突页, 结束打尾行 */
   async function run(kind: LaunchKind, targets: string[]) {
     running = kind;
-    term.entries.push({ kind: 'cmd', text: ['git', kind, ...targets].join(' ') });
+    pushTerm({ kind: 'cmd', text: ['git', kind, ...targets].join(' ') });
     const started = Date.now();
+    // 大输出(如冗长 pull)逐行入 $state 会逐行重排; 合帧后每帧一次批量落地
+    const batch = rafBatcher<TermEntry>((b) => pushTerm(...b));
     const unlisten = await api.onOutput((l: OutputLine) =>
-      term.entries.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line })
+      batch.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line })
     );
     try {
       const outcome = await api.launchOp(kind, targets);
+      batch.drain();
       session.info = await api.repoOpen();
       if (outcome.kind === 'conflicts') {
         session.files = outcome.files;
         await goto('/conflicts');
       } else if (outcome.kind === 'cleanDone') {
         const secs = ((Date.now() - started) / 1000).toFixed(1);
-        term.entries.push({ kind: 'ok', text: `✔ 完成 · 用时 ${secs}s` });
+        pushTerm({ kind: 'ok', text: `✔ 完成 · 用时 ${secs}s` });
       } else {
-        term.entries.push({ kind: 'fail', text: `✘ ${outcome.message}` });
+        pushTerm({ kind: 'fail', text: `✘ ${outcome.message}` });
       }
     } catch (e) {
-      term.entries.push({ kind: 'fail', text: `✘ ${String(e)}` });
+      batch.drain();
+      pushTerm({ kind: 'fail', text: `✘ ${String(e)}` });
     } finally {
       unlisten();
       running = null;
@@ -715,6 +731,8 @@
     line-height: 1.85;
     -webkit-user-select: text;
     user-select: text;
+    /* 渲染隔离: 输出滚动/追加的重绘不外溢到指令列表 */
+    contain: layout paint;
   }
 
   .ln {

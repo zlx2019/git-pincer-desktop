@@ -1,7 +1,7 @@
 <script lang="ts">
   // 打开仓库页(IDEA 暗色小窗): 目录选择 / 拖拽 / 最近列表
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { goto, preloadCode } from '$app/navigation';
   import { open } from '@tauri-apps/plugin-dialog';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { api } from '$lib/api';
@@ -14,6 +14,9 @@
 
   onMount(() => {
     compactWindow().catch(() => {});
+    // 两个可能的下一站预热: 打开仓库时目标页已就绪
+    preloadCode('/menu').catch(() => {});
+    preloadCode('/conflicts').catch(() => {});
     api
       .recentRepos()
       .then((r) => (recent = r))

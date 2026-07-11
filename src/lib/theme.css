@@ -13,6 +13,9 @@
 }
 
 :root {
+  /* 原生控件(滚动条/选择框/高亮)按暗色渲染, 与全局 IDEA 暗色一致 */
+  color-scheme: dark;
+
   --font-ui: -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
 
@@ -56,6 +59,8 @@ body {
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
+  /* 桌面应用整窗不做橡皮筋回弹/滚动链(macOS 触板惯性拖出白边的元凶) */
+  overscroll-behavior: none;
 }
 
 .mono {

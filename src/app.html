@@ -3,6 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <!-- 等宽字体预载: font-display:block 配合预载, 首屏不再有等宽文本闪烁/空窗期 -->
+    <link
+      rel="preload"
+      href="%sveltekit.assets%/fonts/JetBrainsMono-Regular.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>git-pincer</title>
     %sveltekit.head%

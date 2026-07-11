@@ -18,3 +18,15 @@ export interface TermEntry {
 
 /** 菜单页终端缓冲(会话级): 列表页的操作结局(continue 完成 / abort)也汇入这里 */
 export const term = $state({ entries: [] as TermEntry[] });
+
+/** 终端缓冲上限: 超限丢最旧的一批(留余量, 摊薄触发频率), DOM 不随长会话无界增长 */
+const TERM_LIMIT = 2000;
+const TERM_KEEP = 1800;
+
+/** 追加终端条目并执行上限裁剪(高频来源请配合 rAF 合帧批量调用) */
+export function pushTerm(...batch: TermEntry[]) {
+  term.entries.push(...batch);
+  if (term.entries.length > TERM_LIMIT) {
+    term.entries.splice(0, term.entries.length - TERM_KEEP);
+  }
+}

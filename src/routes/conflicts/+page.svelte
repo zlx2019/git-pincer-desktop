@@ -1,12 +1,13 @@
 <script lang="ts">
   // Conflicts 文件列表页(参考图 1): 多选、目录分组、Accept、二进制对话框、Continue/Abort
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { goto, preloadCode } from '$app/navigation';
   import { SvelteSet } from 'svelte/reactivity';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, opTitleSegments, type FileRow, type OutputLine } from '$lib/api';
+  import { rafBatcher } from '$lib/batch';
   import { largeWindow } from '$lib/win';
-  import { session, term } from '$lib/state.svelte';
+  import { pushTerm, session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import BinaryDialog from '$lib/components/BinaryDialog.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -31,6 +32,8 @@
     session.parked = false;
     // 冲突处理使用大窗
     largeWindow().catch(() => {});
+    // 三栏页代码预热(CM6 是最大的路由块): 点 Merge... 时不再现场拉取/解析
+    preloadCode('/merge').catch(() => {});
     // 冲突在终端/IDE 里产生: 窗口重获焦点时自动重探仓库状态
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -41,9 +44,15 @@
     return () => unlisten?.();
   });
 
+  // 聚焦重探限频: 进行中的不叠加, 800ms 冷却(连环焦点事件不再各起一串 git)
+  let probing = false;
+  let lastProbe = 0;
+
   /** 重探仓库与冲突列表(窗口聚焦 / 手动 Refresh); 列表没变化就保住选择状态 */
   async function reprobe() {
     if (running || !session.info) return;
+    if (probing || Date.now() - lastProbe < 800) return;
+    probing = true;
     try {
       const info = await api.repoOpen();
       session.info = info;
@@ -57,6 +66,9 @@
       if (!info.op) goto('/menu');
     } catch (e) {
       toast(String(e));
+    } finally {
+      probing = false;
+      lastProbe = Date.now();
     }
   }
 
@@ -149,21 +161,23 @@
     lastIndex = -1;
   }
 
-  /** 驱动 --continue: 输出走事件流, 结果分 完成/下一轮/失败; 完成详情交给菜单终端 */
+  /** 驱动 --continue: 输出走事件流(rAF 合帧), 结果分 完成/下一轮/失败; 完成详情交给菜单终端 */
   async function doContinue() {
     running = true;
     outputLines = [];
     const op = session.info?.op;
-    const unlisten = await api.onOutput((l) => outputLines.push(l));
+    const batch = rafBatcher<OutputLine>((b) => outputLines.push(...b));
+    const unlisten = await api.onOutput((l) => batch.push(l));
     try {
       const outcome = await api.continueOp();
+      batch.drain();
       if (outcome.kind === 'done') {
         session.info = await api.repoOpen();
-        term.entries.push({ kind: 'cmd', text: `git ${op} --continue` });
+        pushTerm({ kind: 'cmd', text: `git ${op} --continue` });
         for (const l of outputLines) {
-          term.entries.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line });
+          pushTerm({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line });
         }
-        term.entries.push({ kind: 'ok', text: `✔ ${op} completed` });
+        pushTerm({ kind: 'ok', text: `✔ ${op} completed` });
         goto('/menu');
       } else if (outcome.kind === 'nextRound') {
         round += 1;
@@ -196,8 +210,8 @@
       session.info = await api.repoOpen();
       session.files = [];
       if (op) {
-        term.entries.push({ kind: 'cmd', text: `git ${op} --abort` });
-        term.entries.push({ kind: 'ok', text: `✔ ${op} aborted` });
+        pushTerm({ kind: 'cmd', text: `git ${op} --abort` });
+        pushTerm({ kind: 'ok', text: `✔ ${op} aborted` });
       }
       goto('/menu');
     } catch (e) {
