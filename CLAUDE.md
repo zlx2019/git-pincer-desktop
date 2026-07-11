@@ -67,7 +67,7 @@ git 二进制 (继承用户 credentials/hooks/rerere 配置)
 - **结局分流**: launch/continue 结束后**只要 `conflicts()` 非空即接管，与退出码无关**；干净且零退出才算完成。`git://output` 监听是发起前订阅、finally 退订的 JIT 模式，无操作等待期间的输出会被丢弃。
 - **顺序不变量**: cherry-pick 对话框列表新→旧，确认后反转为**旧→新**逐个应用；revert 保持新→旧。
 - **路由即窗口形态** (`src/lib/win.ts`): `/`(打开页) 与 `/menu`(指令面板) 用紧凑小窗 420×640；`/conflicts` 与 `/merge` 切大窗 1280×800。跨页会话状态在 `src/lib/state.svelte.ts` 的 `session` ($state rune)——刷新即失，除打开页外所有路由 onMount 都守卫 `!session.info → goto('/')`（/menu 还会在 op 存在时转 /conflicts）。
-- **接管机制**: 无论操作在面板发起还是终端发起，窗口重获焦点会重探仓库状态，出现冲突即接管切大窗。
+- **接管机制**: 无论操作在面板发起还是终端发起，窗口重获焦点会重探仓库状态，出现冲突即接管切大窗。例外是**搁置**（`session.parked`）：冲突页 Close 置位后回菜单小窗，/menu 守卫与聚焦重探都放行；恢复入口是菜单顶部的琥珀横幅（点击清搁置回 /conflicts），op 进行中五条指令与分支切换禁用；重探发现 op 已结束（外部完成/中止）时搁置自动失效。冲突现场无需持久化——全在 git 仓库里，恢复即重新推导。
 - **托盘驻留** (lib.rs, tauri `tray-icon` feature): 关闭窗口被 `on_window_event` 拦截为隐藏，应用驻留系统托盘（菜单"显示窗口/退出"；Windows/Linux 左键单击唤回，macOS 左键弹菜单、点 Dock 图标经 `RunEvent::Reopen` 唤回）。隐藏不销毁 webview，session 状态原样保留；真正退出走托盘菜单。托盘全在 Rust 侧，无需 capabilities 白名单。
 - **能力白名单**: 前端调用的窗口/插件 API 必须列入 `src-tauri/capabilities/default.json`（现有 core/dialog/opener + window 的 set-size/set-min-size/center），否则运行时被拒。
 

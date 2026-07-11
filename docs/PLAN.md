@@ -109,7 +109,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | 右侧按钮列 | Accept Yours / Accept Theirs / **Merge...** (蓝主按钮); 删除-修改冲突禁用 Merge... (tooltip 说明), 只能 Accept |
 | 二进制行 | Merge... 改弹 pick-one 对话框 (左右预览 + Accept Left/Right) |
 | 左下 | "Group files by directory" 复选 → 目录树分组 |
-| 右下 | Close; 若操作进行中另有 **Continue** 主按钮 (全部解决后) 与 Abort 次按钮 |
+| 右下 | Close = **搁置**(2026-07-11 Zero 定, 对齐 IDEA): 操作与已解决进度留在 git 仓库, 回菜单小窗且抑制自动接管, 菜单顶部琥珀横幅(op + 剩余冲突数)可随时恢复, op 在外部结束时搁置自动失效; 若操作进行中另有 **Continue** 主按钮 (全部解决后) 与 Abort 次按钮 |
 | 无操作空态 | 引导文案(去终端/IDE 发起操作) + Refresh 按钮; **窗口重获焦点自动重探**——外部产生的冲突切回窗口即出现, 列表未变时保留多选状态 |
 
 ### 5.2 Merge Revisions 三栏 (参考图 2)

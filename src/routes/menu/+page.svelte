@@ -70,7 +70,8 @@
       goto('/');
       return;
     }
-    if (session.info.op) {
+    // 操作进行中且未被用户搁置 → 接管进冲突页; 搁置时留在菜单(顶部有恢复横幅)
+    if (session.info.op && !session.parked) {
       goto('/conflicts');
       return;
     }
@@ -84,19 +85,28 @@
     return () => unlisten?.();
   });
 
-  /** 聚焦重探: 有操作进行中(通常带冲突)则直接进冲突页 */
+  /** 聚焦重探: 有操作进行中且未搁置则接管进冲突页; 搁置期间只刷新横幅数据 */
   async function reprobe() {
     if (running || !session.info) return;
     try {
       const info = await api.repoOpen();
       session.info = info;
-      if (info.op) {
-        session.files = await api.conflicts();
-        goto('/conflicts');
+      if (!info.op) {
+        // 操作已结束(在终端完成/中止): 搁置随之失效
+        session.parked = false;
+        return;
       }
+      session.files = await api.conflicts();
+      if (!session.parked) goto('/conflicts');
     } catch (e) {
       toast(String(e));
     }
+  }
+
+  /** 恢复被搁置的冲突解决 */
+  function resume() {
+    session.parked = false;
+    goto('/conflicts');
   }
 
   /** 打开分支切换对话框(当前分支置顶且置灰) */
@@ -141,7 +151,8 @@
 
   /** 点操作: pull 直接执行, merge/rebase 弹分支选择, cherry-pick/revert 弹提交选择 */
   async function act(kind: LaunchKind) {
-    if (running) return;
+    // 已有操作进行中(搁置状态)时不允许再发起, git 也会拒绝
+    if (running || session.info?.op) return;
     const current = session.info?.yoursLabel ?? '';
     try {
       if (kind === 'pull') {
@@ -246,7 +257,12 @@
         </svg>
         {basename(info.root)}
       </span>
-      <button class="chip" title="Switch branch" disabled={running !== null} onclick={askSwitch}>
+      <button
+        class="chip"
+        title="Switch branch"
+        disabled={running !== null || !!info.op}
+        onclick={askSwitch}
+      >
         <svg class="bicon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <circle cx="4.5" cy="3.5" r="1.6" /><circle cx="4.5" cy="12.5" r="1.6" /><circle cx="11.5" cy="6" r="1.6" />
           <path d="M4.5 5.1v5.8M11.5 7.6c0 2.4-4 1.6-6 2.6" />
@@ -270,11 +286,32 @@
         <span class="sub">指令面板</span>
       </div>
 
+      {#if info.op}
+        <!-- 搁置中的操作: 恢复入口(冲突现场在 git 仓库里, 点击回冲突页继续) -->
+        <button class="resume" onclick={resume}>
+          <span class="bn-dot">●</span>
+          <span class="bn-text">
+            <span class="bn-line">
+              <span class="bn-name mono">git {info.op}</span>
+              <span class="bn-zh">进行中 · 已搁置</span>
+            </span>
+            <span class="bn-sub">
+              {session.files.length
+                ? `${session.files.length} 个冲突待解决 · 点击恢复`
+                : '冲突已全部解决, 点击继续 (continue)'}
+            </span>
+          </span>
+          <svg class="bn-go" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 4 4 4-4 4" />
+          </svg>
+        </button>
+      {/if}
+
       {#each actions as a, i (a.kind)}
         <button
           class="row"
           class:running={running === a.kind}
-          disabled={running !== null}
+          disabled={running !== null || !!info.op}
           onclick={() => act(a.kind)}
         >
           <span class="ricon">{@html a.icon}</span>
@@ -330,6 +367,8 @@
       <span class="spacer"></span>
       {#if running}
         <span class="sb-busy">● 执行中</span>
+      {:else if info.op}
+        <span class="sb-busy">● {info.op} 进行中</span>
       {:else}
         <span class="sb-ready">● 就绪</span>
       {/if}
@@ -462,6 +501,68 @@
   .sub {
     color: var(--d-dim);
     font-size: 11px;
+  }
+
+  /* 搁置操作的恢复横幅: 琥珀"进行中"语义, 置于指令列表之上 */
+  .resume {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(217, 163, 67, 0.35);
+    border-radius: 8px;
+    background: rgba(217, 163, 67, 0.08);
+    color: var(--d-text);
+    text-align: left;
+  }
+
+  .resume:hover {
+    background: rgba(217, 163, 67, 0.15);
+  }
+
+  .bn-dot {
+    color: var(--d-amber);
+    flex: none;
+  }
+
+  .bn-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bn-line {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+
+  .bn-name {
+    font-size: 13px;
+  }
+
+  .bn-zh {
+    color: var(--d-amber);
+    font-size: 11px;
+  }
+
+  .bn-sub {
+    font-size: 11px;
+    color: var(--d-dim);
+  }
+
+  .bn-go {
+    color: var(--d-dim);
+    flex: none;
+  }
+
+  .resume:hover .bn-go {
+    color: var(--d-text);
   }
 
   .row {

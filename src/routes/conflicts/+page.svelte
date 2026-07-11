@@ -27,6 +27,8 @@
       goto('/');
       return;
     }
+    // 进入冲突页即视为接手, 清除搁置标志
+    session.parked = false;
     // 冲突处理使用大窗
     largeWindow().catch(() => {});
     // 冲突在终端/IDE 里产生: 窗口重获焦点时自动重探仓库状态
@@ -178,6 +180,13 @@
     }
   }
 
+  /** 暂时关闭(IDEA 行为): 现场留在 git 仓库不受影响, 置搁置标志抑制自动接管,
+      回菜单小窗; 恢复入口是菜单顶部的进行中横幅 */
+  function park() {
+    session.parked = true;
+    goto('/menu');
+  }
+
   /** 中止操作(应用内对话框确认后执行): 结局写入菜单终端, 回菜单小窗 */
   async function doAbort() {
     abortAsk = false;
@@ -246,6 +255,7 @@
 </span>{/each}</pre>
         {/if}
         <div class="row-buttons">
+          <button disabled={running} onclick={park}>Close</button>
           <button disabled={running} onclick={() => (abortAsk = true)}>Abort</button>
           <button class="primary" disabled={running} onclick={doContinue}>
             {running ? 'Running…' : `Continue (git ${info.op} --continue)`}
@@ -311,7 +321,7 @@
         <label><input type="checkbox" bind:checked={groupByDir} /> Group files by directory</label>
         <span class="spacer"></span>
         <button onclick={() => (abortAsk = true)}>Abort</button>
-        <button onclick={() => goto('/menu')}>Close</button>
+        <button title="暂时关闭, 操作与已解决进度保留, 可从菜单恢复" onclick={park}>Close</button>
       </footer>
     {/if}
   </div>

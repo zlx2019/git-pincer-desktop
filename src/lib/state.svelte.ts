@@ -5,6 +5,9 @@ import type { FileRow, RepoInfo } from './api';
 export const session = $state({
   info: null as RepoInfo | null,
   files: [] as FileRow[],
+  /** 操作进行中用户主动关闭了冲突页(搁置): 抑制自动接管, 菜单顶部显示恢复横幅;
+      现场本身在 git 仓库里, 恢复 = 重新进入冲突页推导。op 结束或用户恢复时清除 */
+  parked: false,
 });
 
 /** 终端条目: 命令回显 / 标准输出 / 错误输出 / 成功尾行 / 失败尾行 */
