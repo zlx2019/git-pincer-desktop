@@ -15,6 +15,8 @@ const DIFF_DEADLINE: Duration = Duration::from_millis(500);
 const MAX_DIFF_BYTES: usize = 2 * 1024 * 1024;
 /// 词级强调只处理行数不超过该值的 chunk(控制成本)
 const MAX_EMPHASIS_LINES: usize = 200;
+/// 词级强调只比较字符数不超过该值的行(字符级 diff 无 deadline, 超长单行代价失控)
+const MAX_EMPHASIS_LINE_CHARS: usize = 1000;
 
 /// chunk 的来源侧分类
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -334,9 +336,10 @@ fn push_ranges(out: &mut Vec<[u32; 3]>, line: usize, ranges: Vec<(u32, u32)>) {
 /// 一行内的强调区间列表(UTF-16 起止)
 type LineRanges = Vec<(u32, u32)>;
 
-/// 两行的字符级 diff → 各自的 UTF-16 偏移差异区间(与 CM6 文档坐标一致)
+/// 两行的字符级 diff → 各自的 UTF-16 偏移差异区间(与 CM6 文档坐标一致);
+/// 任一行超过 MAX_EMPHASIS_LINE_CHARS 时跳过(该行无强调, chunk 底色不受影响)
 fn line_emphasis(a: &str, b: &str) -> (LineRanges, LineRanges) {
-    if a == b {
+    if a == b || too_long(a) || too_long(b) {
         return (Vec::new(), Vec::new());
     }
     let ac: Vec<char> = a.chars().collect();
@@ -352,6 +355,11 @@ fn line_emphasis(a: &str, b: &str) -> (LineRanges, LineRanges) {
         append_range(&mut rb, char_range_to_utf16(&bc, op.new_range()));
     }
     (ra, rb)
+}
+
+/// 行内字符数是否超过词级强调上限(只走前 上限+1 个字符, 不遍历全行)
+fn too_long(s: &str) -> bool {
+    s.chars().nth(MAX_EMPHASIS_LINE_CHARS).is_some()
 }
 
 /// char 索引区间 → UTF-16 偏移区间(空区间丢弃)
@@ -453,6 +461,16 @@ mod tests {
         let s = snap(&big, "a\n", "b\n");
         assert_eq!(s.chunks.len(), 1);
         assert_eq!(s.chunks[0].kind, ChunkKind::Conflict);
+    }
+
+    #[test]
+    fn overlong_lines_skip_word_emphasis() {
+        let base = format!("{}\n", "a".repeat(MAX_EMPHASIS_LINE_CHARS + 1));
+        let ours = format!("{}\n", "b".repeat(MAX_EMPHASIS_LINE_CHARS + 1));
+        let s = snap(&base, &ours, &base);
+        assert_eq!(s.chunks.len(), 1);
+        assert_eq!(s.chunks[0].kind, ChunkKind::Ours);
+        assert!(s.chunks[0].left_emphasis.is_empty());
     }
 
     #[test]
