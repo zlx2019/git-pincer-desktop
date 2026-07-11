@@ -8,8 +8,6 @@ rust-version = "1.96.0"
 license = "MIT"
 
 [lib]
-# `_lib` 后缀用于区分 lib 与 bin 的产物名,避免在 Windows 上冲突
-# 见 https://github.com/rust-lang/cargo/issues/8519
 name = "git_pincer_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -25,10 +23,10 @@ serde_json = "1"
 thiserror = "2"
 similar = "3.1"
 
-### Lint 规则(对齐 rust-template)
+### Lint rules
 [lints.rust]
-unsafe_code = "warn"      # 使用 unsafe 代码时告警
-missing_docs = "warn"     # 公共项缺少文档注释时告警
+unsafe_code = "warn"
+missing_docs = "warn"
 
 [lints.clippy]
 unwrap_used = "warn"
@@ -49,4 +47,4 @@ lto = true            # 完整链接时优化(跨 crate 内联), 优于 thin; �
 codegen-units = 1     # 单编译单元，优化更充分（编译更慢）
 opt-level = 3         # 速度优先(diff 引擎受益); 体积由 strip + lto 兜底
 strip = true          # 剥离调试符号，减小二进制体积
-
+panic = "abort"

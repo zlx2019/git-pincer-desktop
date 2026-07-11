@@ -186,7 +186,7 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 - Conflicts 与三栏为**单窗口内路由页**切换, 不开子窗口(小窗↔大窗靠运行时改尺寸);
 - **全局统一 IDEA New UI 暗色**(2026-07-10 Zero 拍板): 冲突大窗布局按参考图 1:1、配色换 IDEA Dark、文案英文; 菜单小窗带中文说明;
 - 撤销只在会话内有效, Apply 落盘后不可撤 (可重新 checkout 制造冲突, 不在本工具内做);
-- **构建 profile**(2026-07-12 定): dev 下依赖统一 O2(similar 热循环走优化码路, `pnpm tauri dev` 体验≈release; 首次构建慢一次, 本 crate 保持 O0 快增量), release 用完整 LTO + codegen-units=1 + opt-level=3 + strip; **不用 `panic = "abort"`**——保留展开让 spawn_blocking 里的意外 panic 落成前端 toast 而非整个应用崩溃, 尾部收益不值这个失效模式;
+- **构建 profile**(2026-07-12 定): dev 下依赖统一 O2(similar 热循环走优化码路, `pnpm tauri dev` 体验≈release; 首次构建慢一次, 本 crate 保持 O0 快增量), release 用完整 LTO + codegen-units=1 + opt-level=3 + strip + `panic = "abort"`(Zero 拍板, 换免展开表的更小更快二进制)。代价要清楚: release 下 spawn_blocking 里的意外 panic 会直接终止应用而不是落成前端 toast——dev 仍是展开, 崩溃排查用 dev 复现; clippy 的 `panic/unwrap_used` 告警把 panic 面压到最低是这个选择的前提;
 - **终端缓冲**: `git://output` 前端 rAF 合帧批量落地, 缓冲上限 2000 条(超限整批丢最旧), 长会话 DOM 不无界增长;
 - **聚焦重探限频**: 800ms 冷却 + 进行中不叠加(菜单页与冲突列表页共同约定);
 - **生产加固**: 禁浏览器右键菜单(可编辑区/有选区除外, 选区保留原生 Copy)与刷新/打印快捷键(刷新丢会话状态); dev 构建不受限。
