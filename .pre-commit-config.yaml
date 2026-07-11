@@ -49,6 +49,14 @@ repos:
         language: system
         files: \.(svelte|ts|js|css)$
         pass_filenames: false
+        # 前端纯逻辑单测(vitest).
+      - id: vitest
+        name: vitest
+        description: Frontend unit tests
+        entry: bash -c 'pnpm test'
+        language: system
+        files: \.(svelte|ts|js)$
+        pass_filenames: false
         # Rust代码语法检测.
       - id: cargo-check
         name: cargo check
