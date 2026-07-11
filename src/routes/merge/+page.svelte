@@ -776,8 +776,8 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    /* 渲染隔离: 栏内滚动/重绘的失效范围不外溢到相邻栏与接缝 */
-    contain: layout paint;
+    /* 不加 CSS containment: WKWebView 对 contain:paint + 滚动容器(含 sticky gutter)
+       有重绘 bug——滚动后接缝色带留下鬼影且新帧不再绘制 */
   }
 
   /* 接缝不设竖边框: 色带与两侧行底色齐平衔接, 读作一个连续形状(IDEA 行为)。
@@ -788,7 +788,6 @@
     position: relative;
     overflow: hidden;
     background: var(--d-canvas);
-    contain: layout paint;
   }
 
   .band {

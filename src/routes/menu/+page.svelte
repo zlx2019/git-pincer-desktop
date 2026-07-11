@@ -731,8 +731,6 @@
     line-height: 1.85;
     -webkit-user-select: text;
     user-select: text;
-    /* 渲染隔离: 输出滚动/追加的重绘不外溢到指令列表 */
-    contain: layout paint;
   }
 
   .ln {
