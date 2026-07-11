@@ -293,6 +293,20 @@ fn lists_branches_and_commits() {
 }
 
 #[test]
+fn rebase_labels_resolve_onto_branch() {
+    let tmp = conflict_setup();
+    git(&tmp.dir, &["switch", "feature"]);
+    git_may_fail(&tmp.dir, &["rebase", "main"]);
+
+    let repo = Repo::discover(&tmp.dir).unwrap();
+    assert_eq!(repo.op(), Some(Op::Rebase));
+    // HEAD 游离, 但 onto 侧应解析为分支名而非短 sha
+    let (yours, theirs) = repo.labels(repo.op());
+    assert_eq!(yours, "main");
+    assert_eq!(theirs, "feature");
+}
+
+#[test]
 fn switch_changes_branch_and_refuses_mid_conflict() {
     // 干净工作区: 切换成功, 标签随之变化
     let tmp = conflict_setup();

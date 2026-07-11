@@ -146,6 +146,9 @@ pub struct CommitInfo {
     pub branch: String,
 }
 
+/// `ls-files -u` 的聚合结果: 冲突路径(首现顺序) + 每路径的 stage 存在性
+type StageIndex = (Vec<String>, HashMap<String, [bool; 3]>);
+
 /// 无状态 git 管道: 仅保存仓库定位, 不缓存任何业务数据
 #[derive(Debug, Clone)]
 pub struct Repo {
@@ -194,12 +197,14 @@ impl Repo {
         }
     }
 
-    /// 双方展示标签: yours = 当前分支(游离 HEAD 退化为短 sha), theirs 按操作类型取对端
+    /// 双方展示标签: yours = 当前分支(游离 HEAD 优先解析 rebase 的 onto 分支, 再退化为短 sha),
+    /// theirs 按操作类型取对端
     pub fn labels(&self, op: Option<Op>) -> (String, String) {
         let yours = {
             let name = self.out_line(&["rev-parse", "--abbrev-ref", "HEAD"]);
             if name.is_empty() || name == "HEAD" {
-                self.out_line(&["rev-parse", "--short", "HEAD"])
+                self.rebase_onto_label()
+                    .unwrap_or_else(|| self.out_line(&["rev-parse", "--short", "HEAD"]))
             } else {
                 name
             }
@@ -223,7 +228,30 @@ impl Repo {
 
     /// 冲突文件列表: `ls-files -u` 按路径聚合, 由缺失 stage 推导两侧状态
     pub fn conflicts(&self) -> Result<Vec<FileRow>, ShellError> {
-        let out = self.run_ok(&["ls-files", "-u", "-z"])?;
+        let (order, stages) = self.conflict_stages(&[])?;
+        Ok(order
+            .into_iter()
+            .map(|path| {
+                let [base, ours, theirs] = stages[&path];
+                FileRow {
+                    yours: side_status(base, ours),
+                    theirs: side_status(base, theirs),
+                    binary: self.sniff_binary(&path),
+                    path,
+                }
+            })
+            .collect())
+    }
+
+    /// `ls-files -u` 输出解析: 冲突路径(首现顺序)与每路径的 stage 存在性;
+    /// paths 非空时仅查询这些路径(pathspec 过滤在 git 侧完成)
+    fn conflict_stages(&self, paths: &[String]) -> Result<StageIndex, ShellError> {
+        let mut args: Vec<&str> = vec!["ls-files", "-u", "-z"];
+        if !paths.is_empty() {
+            args.push("--");
+            args.extend(paths.iter().map(String::as_str));
+        }
+        let out = self.run_ok(&args)?;
         let text = String::from_utf8_lossy(&out.stdout);
         let mut order: Vec<String> = Vec::new();
         let mut stages: HashMap<String, [bool; 3]> = HashMap::new();
@@ -245,18 +273,7 @@ impl Repo {
             });
             entry[stage - 1] = true;
         }
-        Ok(order
-            .into_iter()
-            .map(|path| {
-                let [base, ours, theirs] = stages[&path];
-                FileRow {
-                    yours: side_status(base, ours),
-                    theirs: side_status(base, theirs),
-                    binary: self.sniff_binary(&path),
-                    path,
-                }
-            })
-            .collect())
+        Ok((order, stages))
     }
 
     /// 读取三方内容; 缺失 stage 返回空串; UTF-8 lossy 解码(二进制不走此路径)
@@ -276,16 +293,17 @@ impl Repo {
         }
     }
 
-    /// 整文件取一侧: 该侧存在则 checkout+add; 该侧为"删除"则从索引与工作区移除
+    /// 整文件取一侧: 该侧存在则 checkout+add; 该侧为"删除"则从索引与工作区移除。
+    /// stage 查询限定在传入路径(全量 conflicts() 含逐文件二进制嗅探, 批量场景浪费)
     pub fn accept_side(&self, paths: &[String], side: PickSide) -> Result<(), ShellError> {
-        let rows = self.conflicts()?;
+        let (_, stages) = self.conflict_stages(paths)?;
         for path in paths {
-            let Some(row) = rows.iter().find(|r| &r.path == path) else {
+            let Some(&[base, ours, theirs]) = stages.get(path) else {
                 continue;
             };
             let (status, flag) = match side {
-                PickSide::Yours => (row.yours, "--ours"),
-                PickSide::Theirs => (row.theirs, "--theirs"),
+                PickSide::Yours => (side_status(base, ours), "--ours"),
+                PickSide::Theirs => (side_status(base, theirs), "--theirs"),
             };
             if status == SideStatus::Deleted {
                 self.run_ok(&["rm", "-f", "--ignore-unmatch", "--", path])?;
@@ -488,6 +506,30 @@ impl Repo {
         } else {
             name
         }
+    }
+
+    /// rebase 进行中 onto 侧的可读标签: 读标记目录里的 onto sha, 有分支正指向它则用分支名,
+    /// 否则退化为该 sha 的短形式; 非 rebase 状态(标记文件缺失)返回 None
+    fn rebase_onto_label(&self) -> Option<String> {
+        let sha = ["rebase-merge", "rebase-apply"].iter().find_map(|dir| {
+            std::fs::read_to_string(self.git_dir.join(dir).join("onto"))
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        })?;
+        // for-each-ref 只列真实引用, 不含游离 HEAD 的伪条目; 多分支同指一处时取首个
+        let branch = self.out_line(&[
+            "for-each-ref",
+            "refs/heads",
+            "--points-at",
+            &sha,
+            "--format=%(refname:short)",
+        ]);
+        if !branch.is_empty() {
+            return Some(branch);
+        }
+        let short = self.out_line(&["rev-parse", "--short", &sha]);
+        (!short.is_empty()).then_some(short)
     }
 
     /// rebase 中被变基的分支名(rebase-merge/head-name), 缺失返回空串
