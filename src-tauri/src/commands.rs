@@ -242,6 +242,15 @@ pub async fn branches(state: State<'_, AppState>) -> Result<Vec<Branch>, ShellEr
         .map_err(join_err)?
 }
 
+/// 切换分支(菜单顶栏分支 chip)
+#[tauri::command]
+pub async fn switch_branch(state: State<'_, AppState>, name: String) -> Result<(), ShellError> {
+    let repo = current(&state)?;
+    tauri::async_runtime::spawn_blocking(move || repo.switch(&name))
+        .await
+        .map_err(join_err)?
+}
+
 /// 最近提交列表(cherry-pick/revert 对话框)
 #[tauri::command]
 pub async fn commits(
@@ -274,6 +283,15 @@ pub async fn recent_repos(app: AppHandle) -> Result<Vec<String>, ShellError> {
         .into_iter()
         .filter(|p| Path::new(p).is_dir())
         .collect())
+}
+
+/// 从最近列表移除一个路径(打开页的删除按钮), 返回更新后的列表
+#[tauri::command]
+pub async fn recent_remove(app: AppHandle, path: String) -> Result<Vec<String>, ShellError> {
+    let mut list = load_recent(&app);
+    list.retain(|p| p != &path);
+    save_recent(&app, &list);
+    Ok(list.into_iter().filter(|p| Path::new(p).is_dir()).collect())
 }
 
 /// 取当前仓库的克隆(仅两个 PathBuf), 避免跨 await 持锁
@@ -314,15 +332,20 @@ fn load_recent(app: &AppHandle) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// 持久化最近仓库列表, 失败静默(尽力而为)
+fn save_recent(app: &AppHandle, list: &[String]) {
+    if let Some(file) = recent_file(app)
+        && let Ok(json) = serde_json::to_string_pretty(list)
+    {
+        let _ = std::fs::write(file, json);
+    }
+}
+
 /// 把仓库路径插入最近列表头部(去重、截断), 失败静默
 fn push_recent(app: &AppHandle, root: &str) {
     let mut list = load_recent(app);
     list.retain(|p| p != root);
     list.insert(0, root.to_string());
     list.truncate(RECENT_LIMIT);
-    if let Some(file) = recent_file(app)
-        && let Ok(json) = serde_json::to_string_pretty(&list)
-    {
-        let _ = std::fs::write(file, json);
-    }
+    save_recent(app, &list);
 }

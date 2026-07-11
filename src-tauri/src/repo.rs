@@ -142,6 +142,8 @@ pub struct CommitInfo {
     pub sha: String,
     /// 提交标题
     pub subject: String,
+    /// 来源分支名(others_only 场景由 %S 溯源; 当前分支自身历史为空串)
+    pub branch: String,
 }
 
 /// 无状态 git 管道: 仅保存仓库定位, 不缓存任何业务数据
@@ -368,6 +370,12 @@ impl Repo {
         Ok(())
     }
 
+    /// 切换分支(菜单顶栏入口, 仅在无进行中操作时调用); 工作区不允许切换时由 git 拒绝并携带 stderr
+    pub fn switch(&self, name: &str) -> Result<(), ShellError> {
+        self.run_ok(&["switch", name])?;
+        Ok(())
+    }
+
     /// 本地分支列表(带当前分支标记)
     pub fn branches(&self) -> Result<Vec<Branch>, ShellError> {
         let out = self.run_ok(&["branch", "--format=%(HEAD) %(refname:short)"])?;
@@ -386,14 +394,21 @@ impl Repo {
             .collect())
     }
 
-    /// 最近提交列表; others_only 时只列当前分支尚未包含的提交(cherry-pick 场景)
+    /// 最近提交列表; others_only 时只列当前分支尚未包含的提交(cherry-pick 场景)。
+    /// 字段 NUL 分隔防止标题空格干扰; %S 记录提交经由哪个 ref 到达
     pub fn recent_commits(
         &self,
         others_only: bool,
         limit: usize,
     ) -> Result<Vec<CommitInfo>, ShellError> {
         let n = limit.to_string();
-        let mut args = vec!["log", "--no-decorate", "--pretty=format:%h %s", "-n", &n];
+        let mut args = vec![
+            "log",
+            "--no-decorate",
+            "--pretty=format:%h%x00%S%x00%s",
+            "-n",
+            &n,
+        ];
         if others_only {
             args.extend(["--all", "--not", "HEAD"]);
         }
@@ -401,10 +416,20 @@ impl Repo {
         Ok(String::from_utf8_lossy(&out.stdout)
             .lines()
             .filter_map(|line| {
-                let (sha, subject) = line.split_once(' ')?;
+                let mut parts = line.splitn(3, '\0');
+                let sha = parts.next()?.to_string();
+                let source = parts.next()?.trim();
+                let subject = parts.next()?.to_string();
+                let name = source
+                    .trim_start_matches("refs/heads/")
+                    .trim_start_matches("refs/remotes/")
+                    .trim_start_matches("refs/tags/");
+                // 当前分支自身的历史(HEAD 遍历)不标注来源
+                let branch = if name == "HEAD" { "" } else { name };
                 Some(CommitInfo {
-                    sha: sha.to_string(),
-                    subject: subject.to_string(),
+                    sha,
+                    subject,
+                    branch: branch.to_string(),
                 })
             })
             .collect())

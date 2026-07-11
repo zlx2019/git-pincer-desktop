@@ -22,8 +22,10 @@ pub fn run() {
             commands::continue_op,
             commands::abort_op,
             commands::recent_repos,
+            commands::recent_remove,
             commands::launch_op,
             commands::branches,
+            commands::switch_branch,
             commands::commits,
         ])
         .run(tauri::generate_context!());

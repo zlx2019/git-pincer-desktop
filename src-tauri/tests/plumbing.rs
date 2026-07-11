@@ -275,21 +275,36 @@ fn lists_branches_and_commits() {
     assert!(branches.iter().any(|b| b.name == "main" && b.current));
     assert!(branches.iter().any(|b| b.name == "feature" && !b.current));
 
-    // cherry-pick 场景: feature 独有提交
+    // cherry-pick 场景: feature 独有提交, 且带来源分支名
     let others = repo.recent_commits(true, 20).unwrap();
     assert!(
         others
             .iter()
-            .any(|c| c.subject.contains("feature: conflict.txt"))
+            .any(|c| c.subject.contains("feature: conflict.txt") && c.branch == "feature")
     );
-    // revert 场景: 当前分支提交
+    // revert 场景: 当前分支提交, 不标注来源
     let mine = repo.recent_commits(false, 20).unwrap();
     assert!(
         mine.iter()
-            .any(|c| c.subject.contains("main: conflict.txt"))
+            .any(|c| c.subject.contains("main: conflict.txt") && c.branch.is_empty())
     );
 
     assert_eq!(repo.dirty_count().unwrap(), 0);
+}
+
+#[test]
+fn switch_changes_branch_and_refuses_mid_conflict() {
+    // 干净工作区: 切换成功, 标签随之变化
+    let tmp = conflict_setup();
+    let repo = Repo::discover(&tmp.dir).unwrap();
+    repo.switch("feature").unwrap();
+    let (yours, _) = repo.labels(None);
+    assert_eq!(yours, "feature");
+
+    // 冲突进行中: git 拒绝切换
+    let tmp = merge_conflict_repo();
+    let repo = Repo::discover(&tmp.dir).unwrap();
+    assert!(repo.switch("feature").is_err());
 }
 
 #[test]
