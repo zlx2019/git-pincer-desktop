@@ -97,3 +97,35 @@ export function lineRangeToPos(
   const to = e <= s ? from : e < doc.lines ? doc.line(e + 1).from : doc.length;
   return { from, to };
 }
+
+/** 装饰裁剪窗口: 视口向上下各外扩 padLines 行(滞回余量), 返回文档位置区间 */
+export function paddedClip(
+  doc: EditorState['doc'],
+  vp: { from: number; to: number },
+  padLines: number
+): { from: number; to: number } {
+  const first = doc.lineAt(Math.min(vp.from, doc.length)).number;
+  const last = doc.lineAt(Math.min(vp.to, doc.length)).number;
+  return {
+    from: doc.line(Math.max(1, first - padLines)).from,
+    to: doc.line(Math.min(doc.lines, last + padLines)).to,
+  };
+}
+
+/** 视口是否仍在已建裁剪窗口的安全余量内(false = 需按新视口重建装饰)。
+    余量判定按行数: 距窗口任一非文档端点的边缘不足 guardLines 行即视为将出界 */
+export function clipCovers(
+  doc: EditorState['doc'],
+  clip: { from: number; to: number } | null,
+  vp: { from: number; to: number },
+  guardLines: number
+): boolean {
+  if (!clip) return false;
+  const first = doc.lineAt(Math.min(vp.from, doc.length)).number;
+  const last = doc.lineAt(Math.min(vp.to, doc.length)).number;
+  const cFirst = doc.lineAt(Math.min(clip.from, doc.length)).number;
+  const cLast = doc.lineAt(Math.min(clip.to, doc.length)).number;
+  const topOk = cFirst <= 1 ? first >= cFirst : first - cFirst >= guardLines;
+  const botOk = cLast >= doc.lines ? last <= cLast : cLast - last >= guardLines;
+  return topOk && botOk;
+}

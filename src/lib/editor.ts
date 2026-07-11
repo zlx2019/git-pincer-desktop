@@ -95,13 +95,16 @@ function markerFor(cls: string): GutterLineMarker {
   return m;
 }
 
-/** 构建 chunk 行底色、词级强调与行号槽底色; classFor 决定每个 chunk 的类名(null = 不着色) */
+/** 构建 chunk 行底色、词级强调与行号槽底色; classFor 决定每个 chunk 的类名(null = 不着色)。
+    clip 为可选裁剪窗口(文档位置区间): 只为窗口内的行产出装饰——装饰成本从 O(全部 chunk 行)
+    降为 O(视口行), 大文件降级为整文件单 chunk 时逐键重建不再卡顿 */
 export function buildPaneDecos(
   doc: EditorState['doc'],
   chunks: MergeChunk[],
   pane: Pane,
   classFor: (c: MergeChunk) => string | null,
-  resultRanges?: { from: number; to: number }[]
+  resultRanges?: { from: number; to: number }[],
+  clip?: { from: number; to: number }
 ): [DecorationSet, DecorationSet, RangeSet<GutterMarker>] {
   const lineB = new RangeSetBuilder<Decoration>();
   const markB = new RangeSetBuilder<Decoration>();
@@ -119,6 +122,11 @@ export function buildPaneDecos(
       if (!range) continue;
       ({ from, to } = lineRangeToPos(doc, range));
     }
+    if (clip) {
+      if (to < clip.from || from > clip.to) continue;
+      from = Math.max(from, doc.lineAt(Math.min(clip.from, doc.length)).from);
+      to = Math.min(to, clip.to);
+    }
     // 行号槽只取基础类(去掉 ck-cur 之类的附加态, 避免槽位重复描边)
     const gutterCls = cls.split(' ')[0];
     for (let pos = from; pos < to && pos < doc.length; ) {
@@ -135,6 +143,7 @@ export function buildPaneDecos(
       const ln = range[0] + rel;
       if (ln >= doc.lines) continue;
       const line = doc.line(ln + 1);
+      if (clip && (line.to < clip.from || line.from > clip.to)) continue;
       const mf = Math.min(line.from + a, line.to);
       const mt = Math.min(line.from + b, line.to);
       if (mt > mf) markB.add(mf, mt, Decoration.mark({ class: 'ck-em' }));
@@ -160,27 +169,36 @@ export function readonlyExtensions(lang: Extension): Extension[] {
   ];
 }
 
-/** 锚点分段线性同步滚动; 返回解绑函数 */
+/** 锚点分段线性同步滚动; 返回解绑函数。
+    程序写入的 scrollTop 逐目标记账: 目标栏随后触发的 scroll 事件是回声, 直接吞掉——
+    旧实现用 rAF 重置全局锁, 回声穿过锁窗口后被反向映射, 往返取整造成 1px 级抖动/橡皮感 */
 export function linkScroll(panes: { view: EditorView; anchors: number[] }[]): () => void {
-  let syncing = false;
+  const written = new Map<HTMLElement, number>();
   const handlers: [HTMLElement, () => void][] = [];
   for (let i = 0; i < panes.length; i++) {
     const src = panes[i];
     const el = src.view.scrollDOM;
     const handler = () => {
-      if (syncing) return;
-      syncing = true;
+      const w = written.get(el);
+      if (w !== undefined) {
+        written.delete(el);
+        // 与记账值一致 = 纯回声; 不一致说明用户在该栏另有滚动, 照常转发
+        if (Math.abs(el.scrollTop - w) < 1) return;
+      }
       const srcLine = el.scrollTop / src.view.defaultLineHeight;
       const seg = locate(src.anchors, srcLine);
       for (let j = 0; j < panes.length; j++) {
         if (j === i) continue;
         const dst = panes[j];
-        const dstLine = mapLine(src.anchors, dst.anchors, seg, srcLine);
-        dst.view.scrollDOM.scrollTop = dstLine * dst.view.defaultLineHeight;
+        const dstEl = dst.view.scrollDOM;
+        const top = mapLine(src.anchors, dst.anchors, seg, srcLine) * dst.view.defaultLineHeight;
+        if (Math.abs(dstEl.scrollTop - top) < 1) continue;
+        dstEl.scrollTop = top;
+        // 记录写后的实际值(浏览器会按可滚动范围取整/夹取)
+        written.set(dstEl, dstEl.scrollTop);
       }
-      requestAnimationFrame(() => (syncing = false));
     };
-    el.addEventListener('scroll', handler);
+    el.addEventListener('scroll', handler, { passive: true });
     handlers.push([el, handler]);
   }
   return () => {

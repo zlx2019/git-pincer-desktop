@@ -12,9 +12,11 @@
   import {
     applyAllTargets,
     applyEdit,
+    clipCovers,
     isResolved,
     joinedText,
     navTarget,
+    paddedClip,
     paneClass,
     type ChunkState,
   } from '$lib/chunks';
@@ -43,6 +45,10 @@
   }
 
   const SEAM = 44;
+  // 装饰裁剪窗口: 视口外扩 400 行构建, 视口逼近窗口边缘 100 行内才重建——
+  // 平滑滚动时每滚约 300 行才有一次装饰 dispatch, 其余帧零重建
+  const PAD_LINES = 400;
+  const GUARD_LINES = 100;
   /// chunk 操作事务标记: 与手工编辑区分, 且不进 CM6 历史(有独立撤销栈)
   const chunkOp = Annotation.define<boolean>();
 
@@ -81,24 +87,62 @@
   const centerComp = new Compartment();
   const rightComp = new Compartment();
   let decoScheduled = false;
-  // 侧栏装饰的类名签名缓存: 签名不变(手工打字的高频路径)就跳过该栏重建
-  let sideSigL = '';
-  let sideSigR = '';
+  // 每栏装饰缓存: 类名签名 + 已建裁剪窗口。签名与窗口都未失效(手工打字/小幅滚动的
+  // 高频路径)就跳过该栏重建; 中栏区间随编辑漂移, 每次调度都重建(有裁剪, 成本有界)
+  const decoCache: { sig: string; clip: { from: number; to: number } | null }[] = [
+    { sig: '', clip: null },
+    { sig: '', clip: null },
+    { sig: '', clip: null },
+  ];
 
   const changesLeft = $derived.by(() => states.filter((_, i) => !resolved(i)).length);
   const conflictsLeft = $derived.by(() =>
     snap ? snap.chunks.filter((c) => c.kind === 'conflict' && !resolved(c.id)).length : 0
   );
-  /// 接缝渲染的视口粗筛: 只保留中栏实时区间与 CM6 viewport(自带上下外扩余量)相交的 chunk,
-  /// 屏外 chunk 不再逐帧计算几何与绘制路径/按钮
-  const visibleChunks = $derived.by(() => {
+  interface SeamGeom {
+    ys1: number;
+    ys2: number;
+    yc1: number;
+    yc2: number;
+  }
+
+  /// 接缝几何统一在此每帧计算一次: 视口粗筛(中栏实时区间 × CM6 viewport 自带外扩)后,
+  /// 为可见 chunk 算出左右缝四角 y。坐标基准(documentTop / getBoundingClientRect)
+  /// 每帧每栏只读一次——布局读取集中在模板写入之前, 消除逐 chunk 交错读写的强制布局;
+  /// SVG 路径与按钮两个 each 块共享同一份结果, 几何不再算两遍
+  const seamGeoms = $derived.by(() => {
     void scrollTick;
-    if (!mounted || !snap || !views[1]) return [];
-    const vp = views[1].viewport;
-    return snap.chunks.filter((c) => {
-      const r = resultRanges[c.id];
-      return r && r.to >= vp.from && r.from <= vp.to;
-    });
+    if (!mounted || !snap) return [];
+    const [lv, cv, rv] = views;
+    if (!lv || !cv || !rv) return [];
+    const vp = cv.viewport;
+    const base = [lv, cv, rv].map((v) => v.documentTop - v.scrollDOM.getBoundingClientRect().top);
+    // pos 在该 pane 视口内的 y(基准已含滚动量与内容顶部内边距)
+    const topAt = (v: EditorView, b: number, pos: number) =>
+      v.lineBlockAt(Math.min(pos, v.state.doc.length)).top + b;
+    // 行号(静态侧栏)对应的视口 y
+    const lineTop = (v: EditorView, b: number, line: number) => {
+      const doc = v.state.doc;
+      return topAt(v, b, line < doc.lines ? doc.line(line + 1).from : doc.length);
+    };
+    const side = (v: EditorView, b: number, sr: [number, number], yc1: number, yc2: number) => {
+      const ys1 = lineTop(v, b, sr[0]);
+      const ys2 = sr[1] > sr[0] ? lineTop(v, b, sr[1]) : ys1 + 2;
+      return { ys1, ys2, yc1, yc2 };
+    };
+    const out: { c: MergeChunk; l: SeamGeom | null; r: SeamGeom | null }[] = [];
+    for (const c of snap.chunks) {
+      const rr = resultRanges[c.id];
+      if (!rr || rr.to < vp.from || rr.from > vp.to) continue;
+      const yc1 = topAt(cv, base[1], rr.from);
+      const yc2 = rr.to > rr.from ? topAt(cv, base[1], rr.to) : yc1 + 2;
+      out.push({
+        c,
+        l: c.kind === 'theirs' ? null : side(lv, base[0], c.leftRange, yc1, yc2),
+        r: c.kind === 'ours' ? null : side(rv, base[2], c.rightRange, yc1, yc2),
+      });
+    }
+    return out;
   });
 
   onMount(() => {
@@ -134,21 +178,31 @@
   }
 
   /// CM6 的行高测量是异步的(初次布局/字体就绪后才准), 几何变化时必须触发接缝重绘,
-  /// 否则按初始估算行高算出的按钮/色带位置会随行号累积偏移
+  /// 否则按初始估算行高算出的按钮/色带位置会随行号累积偏移;
+  /// 视口移动时检查装饰裁剪窗口是否将出界, 是则调度重建(滞回, 并非逐帧)
   const geoTick = EditorView.updateListener.of((u) => {
     if (u.geometryChanged) bumpTick();
+    if (u.viewportChanged && clipsStale()) scheduleDecos();
   });
+
+  /** 任一栏视口逼近其装饰裁剪窗口边缘 → 需要重建 */
+  function clipsStale(): boolean {
+    if (!mounted) return false;
+    return views.some(
+      (v, i) => !clipCovers(v.state.doc, decoCache[i].clip, v.viewport, GUARD_LINES)
+    );
+  }
 
   /** 拉取快照并构建三栏 */
   async function load() {
     try {
-      const s = await api.openMerge(path);
+      // 快照(Rust 引擎)与语言包(动态 import)无依赖, 并行拉取
+      const [s, lang] = await Promise.all([api.openMerge(path), languageFor(path)]);
       snap = s;
       leftLines = s.left.split('\n');
       rightLines = s.right.split('\n');
       baseLines = s.result.split('\n');
       states = s.chunks.map(() => ({ ours: 'pending', theirs: 'pending', edited: false }));
-      const lang = await languageFor(s.path);
       await new Promise((r) => requestAnimationFrame(r));
       if (!leftEl || !resultEl || !rightEl) return;
 
@@ -250,33 +304,49 @@
     if (!snap) return;
     const [lv, cv, rv] = views;
     if (!lv || !cv || !rv) return;
-    const mk = (v: EditorView, pane: Pane, cls: (c: MergeChunk) => string | null) => {
+    // 每栏只为裁剪窗口内的行构建装饰(成本与视口成正比, 与文件/chunk 大小无关);
+    // 侧栏文档只读不变: 类名签名与裁剪窗口都未失效就跳过该栏重建
+    // (手工打字只触发中栏重建, 侧栏的词级强调不逐键重算);
+    // 中栏区间随编辑漂移无廉价签名, force 每次调度都重建
+    const upd = (
+      idx: number,
+      v: EditorView,
+      pane: Pane,
+      cls: (c: MergeChunk) => string | null,
+      comp: Compartment,
+      force: boolean
+    ) => {
+      const sig = snap!.chunks.map(cls).join(' ');
+      const cache = decoCache[idx];
+      if (
+        !force &&
+        sig === cache.sig &&
+        clipCovers(v.state.doc, cache.clip, v.viewport, GUARD_LINES)
+      ) {
+        return;
+      }
+      const clip = paddedClip(v.state.doc, v.viewport, PAD_LINES);
+      cache.sig = sig;
+      cache.clip = clip;
       const [lines, marks, gutters] = buildPaneDecos(
         v.state.doc,
         snap!.chunks,
         pane,
         cls,
-        pane === 'result' ? resultRanges : undefined
+        pane === 'result' ? resultRanges : undefined,
+        clip
       );
-      return [
-        EditorView.decorations.of(lines),
-        EditorView.decorations.of(marks),
-        gutterLineClass.of(gutters),
-      ];
+      v.dispatch({
+        effects: comp.reconfigure([
+          EditorView.decorations.of(lines),
+          EditorView.decorations.of(marks),
+          gutterLineClass.of(gutters),
+        ]),
+      });
     };
-    // 侧栏文档只读不变, 装饰仅随 chunk 状态变: 类名签名相同就跳过该栏重建
-    // (手工打字只触发中栏重建, 侧栏的词级强调不再逐键重算)
-    const sigL = snap.chunks.map(leftClass).join(' ');
-    if (sigL !== sideSigL) {
-      sideSigL = sigL;
-      lv.dispatch({ effects: leftComp.reconfigure(mk(lv, 'left', leftClass)) });
-    }
-    const sigR = snap.chunks.map(rightClass).join(' ');
-    if (sigR !== sideSigR) {
-      sideSigR = sigR;
-      rv.dispatch({ effects: rightComp.reconfigure(mk(rv, 'right', rightClass)) });
-    }
-    cv.dispatch({ effects: centerComp.reconfigure(mk(cv, 'result', centerClass)) });
+    upd(0, lv, 'left', leftClass, leftComp, false);
+    upd(2, rv, 'right', rightClass, rightComp, false);
+    upd(1, cv, 'result', centerClass, centerComp, true);
     scrollTick += 1;
   }
 
@@ -414,55 +484,18 @@
   }
 
   // ── 接缝几何 ─────────────────────────────────────
-
-  /** pos 在该 pane 视口内的 y 坐标; documentTop 已含滚动量与内容顶部内边距 */
-  function posTop(v: EditorView, pos: number): number {
-    return (
-      v.lineBlockAt(Math.min(pos, v.state.doc.length)).top +
-      v.documentTop -
-      v.scrollDOM.getBoundingClientRect().top
-    );
-  }
-
-  /** 行号(静态侧栏)对应的视口 y */
-  function lineTopStatic(v: EditorView, line: number): number {
-    const doc = v.state.doc;
-    const pos = line < doc.lines ? doc.line(line + 1).from : doc.length;
-    return posTop(v, pos);
-  }
-
-  /** 接缝内一个 chunk 的四角 y(侧栏起止 + 中栏起止); 对侧无关的 chunk 返回 null */
-  function chunkGeom(c: MergeChunk, seam: 'l' | 'r') {
-    void scrollTick;
-    if (!mounted) return null;
-    const side = seam === 'l' ? views[0] : views[2];
-    const center = views[1];
-    if (!side || !center) return null;
-    if (seam === 'l' ? c.kind === 'theirs' : c.kind === 'ours') return null;
-    const sr = seam === 'l' ? c.leftRange : c.rightRange;
-    const ys1 = lineTopStatic(side, sr[0]);
-    const ys2 = sr[1] > sr[0] ? lineTopStatic(side, sr[1]) : ys1 + 2;
-    const r = resultRanges[c.id];
-    const yc1 = posTop(center, r.from);
-    const yc2 = r.to > r.from ? posTop(center, r.to) : yc1 + 2;
-    return { ys1, ys2, yc1, yc2 };
-  }
+  // (四角 y 的计算集中在 seamGeoms derived, 每帧一次)
 
   /** 接缝连接带路径(左缝: 侧→中, 右缝镜像)。
       控制点放在两端 30% 处而非正中: 中段是匀坡近直线、只在进出口带圆角缓冲(IDEA 的斜扫观感),
       避免坡度全部堆在中段把窄带挤成竖管 */
-  function bandPath(g: { ys1: number; ys2: number; yc1: number; yc2: number }, seam: 'l' | 'r') {
+  function bandPath(g: SeamGeom, seam: 'l' | 'r') {
     const [x0, x1] = seam === 'l' ? [0, SEAM] : [SEAM, 0];
     const dx = (x1 - x0) * 0.3;
     return (
       `M${x0} ${g.ys1} C${x0 + dx} ${g.ys1} ${x1 - dx} ${g.yc1} ${x1} ${g.yc1}` +
       ` L${x1} ${g.yc2} C${x1 - dx} ${g.yc2} ${x0 + dx} ${g.ys2} ${x0} ${g.ys2} Z`
     );
-  }
-
-  /** 该 chunk 在此缝的待处理侧 */
-  function seamSide(seam: 'l' | 'r'): 'ours' | 'theirs' {
-    return seam === 'l' ? 'ours' : 'theirs';
   }
 
   /** 快捷键: F7/⇧F7 导航, ⌘/Ctrl+⏎ Apply, Esc 回列表(对齐 IDEA); 确认框打开时让位给对话框 */
@@ -548,27 +581,25 @@
 
       <div class="seam" onwheel={seamWheel}>
         <svg class="band" width={SEAM} height="100%">
-          {#each visibleChunks as c (c.id)}
-            {@const g = chunkGeom(c, 'l')}
-            {#if g}
+          {#each seamGeoms as sg (sg.c.id)}
+            {#if sg.l}
               <path
-                d={bandPath(g, 'l')}
+                d={bandPath(sg.l, 'l')}
                 class="bandp"
-                class:done={resolved(c.id)}
-                style="--band-color:var(--chunk-{c.visual})"
+                class:done={resolved(sg.c.id)}
+                style="--band-color:var(--chunk-{sg.c.visual})"
               />
             {/if}
           {/each}
         </svg>
-        {#each visibleChunks as c (c.id)}
-          {@const g = chunkGeom(c, 'l')}
-          {#if g}
-            <div class="gbtns" style="top:{g.ys1 + 1}px">
-              {#if !states[c.id].edited && states[c.id][seamSide('l')] === 'pending'}
-                <button class="gb" title="Ignore" onclick={() => ignoreSide(c.id, 'ours')}>{@html IC.ignore}</button>
-                <button class="gb" title="Apply this change" onclick={() => applySide(c.id, 'ours')}>{@html IC.applyL}</button>
+        {#each seamGeoms as sg (sg.c.id)}
+          {#if sg.l}
+            <div class="gbtns" style="top:{sg.l.ys1 + 1}px">
+              {#if !states[sg.c.id].edited && states[sg.c.id].ours === 'pending'}
+                <button class="gb" title="Ignore" onclick={() => ignoreSide(sg.c.id, 'ours')}>{@html IC.ignore}</button>
+                <button class="gb" title="Apply this change" onclick={() => applySide(sg.c.id, 'ours')}>{@html IC.applyL}</button>
               {:else}
-                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(c.id)}>{@html IC.revert}</button>
+                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(sg.c.id)}>{@html IC.revert}</button>
               {/if}
             </div>
           {/if}
@@ -579,27 +610,25 @@
 
       <div class="seam" onwheel={seamWheel}>
         <svg class="band" width={SEAM} height="100%">
-          {#each visibleChunks as c (c.id)}
-            {@const g = chunkGeom(c, 'r')}
-            {#if g}
+          {#each seamGeoms as sg (sg.c.id)}
+            {#if sg.r}
               <path
-                d={bandPath(g, 'r')}
+                d={bandPath(sg.r, 'r')}
                 class="bandp"
-                class:done={resolved(c.id)}
-                style="--band-color:var(--chunk-{c.visual})"
+                class:done={resolved(sg.c.id)}
+                style="--band-color:var(--chunk-{sg.c.visual})"
               />
             {/if}
           {/each}
         </svg>
-        {#each visibleChunks as c (c.id)}
-          {@const g = chunkGeom(c, 'r')}
-          {#if g}
-            <div class="gbtns right" style="top:{g.ys1 + 1}px">
-              {#if !states[c.id].edited && states[c.id][seamSide('r')] === 'pending'}
-                <button class="gb" title="Apply this change" onclick={() => applySide(c.id, 'theirs')}>{@html IC.applyR}</button>
-                <button class="gb" title="Ignore" onclick={() => ignoreSide(c.id, 'theirs')}>{@html IC.ignore}</button>
+        {#each seamGeoms as sg (sg.c.id)}
+          {#if sg.r}
+            <div class="gbtns right" style="top:{sg.r.ys1 + 1}px">
+              {#if !states[sg.c.id].edited && states[sg.c.id].theirs === 'pending'}
+                <button class="gb" title="Apply this change" onclick={() => applySide(sg.c.id, 'theirs')}>{@html IC.applyR}</button>
+                <button class="gb" title="Ignore" onclick={() => ignoreSide(sg.c.id, 'theirs')}>{@html IC.ignore}</button>
               {:else}
-                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(c.id)}>{@html IC.revert}</button>
+                <button class="gb" title="Revert this chunk" onclick={() => revertChunk(sg.c.id)}>{@html IC.revert}</button>
               {/if}
             </div>
           {/if}
@@ -747,6 +776,8 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    /* 渲染隔离: 栏内滚动/重绘的失效范围不外溢到相邻栏与接缝 */
+    contain: layout paint;
   }
 
   /* 接缝不设竖边框: 色带与两侧行底色齐平衔接, 读作一个连续形状(IDEA 行为)。
@@ -757,6 +788,7 @@
     position: relative;
     overflow: hidden;
     background: var(--d-canvas);
+    contain: layout paint;
   }
 
   .band {

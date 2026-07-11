@@ -5,10 +5,12 @@ import type { ChunkKind, ChunkVisual, MergeChunk } from './api';
 import {
   applyAllTargets,
   applyEdit,
+  clipCovers,
   isResolved,
   joinedText,
   lineRangeToPos,
   navTarget,
+  paddedClip,
   paneClass,
   paneRange,
   relevantSides,
@@ -166,5 +168,40 @@ describe('paneRange / lineRangeToPos', () => {
     expect(lineRangeToPos(doc, [1, 3])).toEqual({ from: 2, to: 6 });
     expect(lineRangeToPos(doc, [3, 3])).toEqual({ from: 6, to: 6 }); // 空区间(插入点)
     expect(lineRangeToPos(doc, [2, 4])).toEqual({ from: 4, to: 6 }); // 区间尾越界取文末
+  });
+});
+
+describe('paddedClip / clipCovers', () => {
+  // 1000 行等宽文档: 每行内容 "x"(2 字符含换行), 行 n(1 基) 行首位置 = (n-1)*2
+  const doc = Text.of(Array.from({ length: 1000 }, () => 'x'));
+  const lineFrom = (n: number) => doc.line(n).from;
+
+  it('裁剪窗口 = 视口上下各扩 pad 行, 文档端点封顶', () => {
+    const vp = { from: lineFrom(500), to: lineFrom(520) };
+    const clip = paddedClip(doc, vp, 100);
+    expect(clip.from).toBe(lineFrom(400));
+    expect(clip.to).toBe(doc.line(620).to);
+    // 顶部/底部不足 pad 行时贴住文档端点
+    expect(paddedClip(doc, { from: 0, to: lineFrom(10) }, 100).from).toBe(0);
+    expect(paddedClip(doc, { from: lineFrom(950), to: doc.length }, 100).to).toBe(doc.length);
+  });
+
+  it('视口在窗口安全余量内不重建, 逼近边缘或跳出则重建', () => {
+    const clip = paddedClip(doc, { from: lineFrom(500), to: lineFrom(520) }, 100);
+    // 原位: 距两侧边缘各 100 行, 恰好等于 guard → 覆盖
+    expect(clipCovers(doc, clip, { from: lineFrom(500), to: lineFrom(520) }, 100)).toBe(true);
+    // 上移 50 行: 距上边缘仅 50 行 < guard → 需重建
+    expect(clipCovers(doc, clip, { from: lineFrom(450), to: lineFrom(470) }, 100)).toBe(false);
+    // 跳出窗口(ruler 跳转) → 需重建
+    expect(clipCovers(doc, clip, { from: lineFrom(50), to: lineFrom(70) }, 100)).toBe(false);
+    // 未建过窗口 → 需重建
+    expect(clipCovers(doc, null, { from: 0, to: 10 }, 100)).toBe(false);
+  });
+
+  it('窗口贴住文档端点时, 该侧不再要求余量(文首/文尾无处可扩)', () => {
+    const top = paddedClip(doc, { from: 0, to: lineFrom(20) }, 100);
+    expect(clipCovers(doc, top, { from: 0, to: lineFrom(20) }, 100)).toBe(true);
+    const bottom = paddedClip(doc, { from: lineFrom(980), to: doc.length }, 100);
+    expect(clipCovers(doc, bottom, { from: lineFrom(980), to: doc.length }, 100)).toBe(true);
   });
 });
