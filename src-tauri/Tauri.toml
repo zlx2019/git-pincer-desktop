@@ -26,9 +26,7 @@ accept-first-mouse = true
 background-color = "#1e1f22"
 theme = "Dark"
 
-# CSP 加固(纯静态 SPA, 无远程内容): 脚本/连接仅限自身与 Tauri IPC 通道
-# (macOS 走 ipc:, Windows 走 http://ipc.localhost, Tauri 会为自身注入脚本加 nonce);
-# style 需 unsafe-inline(CM6/Svelte 大量内联样式), 字体/图片全部随包分发
+
 [app.security]
 csp = "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
 
