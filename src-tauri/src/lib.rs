@@ -19,11 +19,12 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
-/// 建系统托盘: 菜单 = 显示窗口 / 退出。
+/// 建系统托盘: 菜单 = 显示窗口 / 退出(文案随语言设置, 切换时就地更新)。
 /// macOS 左键即弹菜单(菜单栏惯例); Windows/Linux 菜单挂右键, 左键单击直接唤回窗口
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let (show_txt, quit_txt) = app.state::<commands::AppState>().language().tray_labels();
+    let show = MenuItem::with_id(app, "show", show_txt, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", quit_txt, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("git-pincer")
@@ -49,6 +50,8 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
+    app.state::<commands::AppState>()
+        .set_tray_items((show, quit));
     Ok(())
 }
 
@@ -80,11 +83,14 @@ pub fn run() {
         ])
         .setup(|app| {
             // 设置先于一切 UI 逻辑加载(关窗行为等在事件回调里同步读取)
-            if let Some(file) = commands::settings_file(app.handle()) {
-                app.state::<commands::AppState>()
-                    .init_settings(settings::Settings::load(&file));
-            }
+            let loaded = commands::settings_file(app.handle())
+                .map(|f| settings::Settings::load(&f))
+                .unwrap_or_default();
+            app.state::<commands::AppState>()
+                .init_settings(loaded.clone());
             build_tray(app)?;
+            // 窗口原生主题/底色按持久化设置就位(窗口尚未 show, 无闪变)
+            commands::apply_to_shell(app.handle(), &loaded);
             Ok(())
         })
         .on_window_event(|window, event| {

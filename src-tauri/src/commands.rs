@@ -10,23 +10,43 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::error::ShellError;
 use crate::merge::MergeSnapshot;
 use crate::repo::{Branch, CommitInfo, FileRow, LaunchKind, Op, PickSide, Repo, ThreeWay};
-use crate::settings::{CloseBehavior, Settings};
+use crate::settings::{AppTheme, CloseBehavior, Language, Settings};
 
 /// 最近仓库列表的最大长度
 const RECENT_LIMIT: usize = 10;
 
-/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态 + 用户设置(启动时从盘加载)
+/// 托盘菜单项句柄 (显示窗口, 退出): 语言切换时就地改文案, 不重建托盘
+type TrayItems = (
+    tauri::menu::MenuItem<tauri::Wry>,
+    tauri::menu::MenuItem<tauri::Wry>,
+);
+
+/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态 + 用户设置(启动时从盘加载) + 托盘句柄
 #[derive(Default)]
 pub struct AppState {
     repo: Mutex<Option<Repo>>,
     win_form: Mutex<Option<WinForm>>,
     settings: Mutex<Settings>,
+    tray: Mutex<Option<TrayItems>>,
 }
 
 impl AppState {
     /// 启动时注入从盘上读到的设置(setup 阶段调用一次)
     pub fn init_settings(&self, s: Settings) {
         *self.settings.lock().unwrap_or_else(|e| e.into_inner()) = s;
+    }
+
+    /// 当前语言(lib.rs 建托盘时取初始文案)
+    pub fn language(&self) -> Language {
+        self.settings
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .language
+    }
+
+    /// 托盘建好后登记菜单项句柄(语言切换要就地改文案)
+    pub fn set_tray_items(&self, items: TrayItems) {
+        *self.tray.lock().unwrap_or_else(|e| e.into_inner()) = Some(items);
     }
 
     /// 关窗是否收进托盘(lib.rs 的关闭拦截按此分流)
@@ -36,6 +56,29 @@ impl AppState {
             .unwrap_or_else(|e| e.into_inner())
             .close_behavior
             == CloseBehavior::Tray
+    }
+}
+
+/// 把设置应用到壳层(setup 与 set_settings 共用): 窗口原生主题与底色
+/// (标题栏观感 / resize 露底色) + 托盘菜单文案; 全部尽力而为, 失败不打断
+pub fn apply_to_shell(app: &AppHandle, s: &Settings) {
+    if let Some(win) = app.get_webview_window("main") {
+        let (theme, bg) = match s.theme {
+            AppTheme::Dark => (tauri::Theme::Dark, tauri::webview::Color(30, 31, 34, 255)),
+            AppTheme::Light => (
+                tauri::Theme::Light,
+                tauri::webview::Color(255, 255, 255, 255),
+            ),
+        };
+        let _ = win.set_theme(Some(theme));
+        let _ = win.set_background_color(Some(bg));
+    }
+    let state = app.state::<AppState>();
+    let tray = state.tray.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((show, quit)) = &*tray {
+        let (show_txt, quit_txt) = s.language.tray_labels();
+        let _ = show.set_text(show_txt);
+        let _ = quit.set_text(quit_txt);
     }
 }
 
@@ -150,7 +193,7 @@ pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, ShellE
         .clone())
 }
 
-/// 更新设置: 归一化 → 内存 → 落盘; 返回归一化结果供前端回同步
+/// 更新设置: 归一化 → 内存 → 壳层应用(窗口主题/托盘文案) → 落盘; 返回归一化结果供前端回同步
 #[tauri::command]
 pub async fn set_settings(
     app: AppHandle,
@@ -159,6 +202,7 @@ pub async fn set_settings(
 ) -> Result<Settings, ShellError> {
     let s = settings.normalized();
     *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = s.clone();
+    apply_to_shell(&app, &s);
     let file = settings_file(&app)
         .ok_or_else(|| ShellError::Internal("cannot resolve app data dir".into()))?;
     s.save(&file)

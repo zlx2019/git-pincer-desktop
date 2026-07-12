@@ -22,6 +22,38 @@ pub enum CloseBehavior {
     Quit,
 }
 
+/// 界面主题(IDEA New UI 双色系)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AppTheme {
+    /// 暗色(默认)
+    #[default]
+    Dark,
+    /// 亮色
+    Light,
+}
+
+/// 界面语言
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    /// 中文(默认): 保持"大窗 IDEA 英文原文 + 小窗中文辅助"的分层设计
+    #[default]
+    Zh,
+    /// 全英文: 小窗辅助文案也切英文
+    En,
+}
+
+impl Language {
+    /// 托盘菜单文案 (显示窗口, 退出)
+    pub fn tray_labels(self) -> (&'static str, &'static str) {
+        match self {
+            Language::Zh => ("显示窗口", "退出"),
+            Language::En => ("Show Window", "Quit"),
+        }
+    }
+}
+
 /// 用户设置(与前端 `api.ts` 的 `Settings` 严格镜像, camelCase)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -34,6 +66,10 @@ pub struct Settings {
     pub close_behavior: CloseBehavior,
     /// 三栏词级强调的默认开关
     pub highlight_words: bool,
+    /// 界面主题
+    pub theme: AppTheme,
+    /// 界面语言
+    pub language: Language,
 }
 
 impl Default for Settings {
@@ -43,6 +79,8 @@ impl Default for Settings {
             editor_font_family: String::new(),
             close_behavior: CloseBehavior::Tray,
             highlight_words: true,
+            theme: AppTheme::Dark,
+            language: Language::Zh,
         }
     }
 }
@@ -102,6 +140,8 @@ mod tests {
         assert_eq!(s.editor_font_family, "");
         assert_eq!(s.close_behavior, CloseBehavior::Tray);
         assert!(s.highlight_words);
+        assert_eq!(s.theme, AppTheme::Dark);
+        assert_eq!(s.language, Language::Zh);
     }
 
     #[test]
@@ -123,13 +163,17 @@ mod tests {
             editor_font_family: "Fira Code".into(),
             close_behavior: CloseBehavior::Quit,
             highlight_words: false,
+            theme: AppTheme::Light,
+            language: Language::En,
         };
         s.save(&file).unwrap();
         assert_eq!(Settings::load(&file), s);
-        // 文件键名为 camelCase(与前端镜像一致)
+        // 文件键名为 camelCase(与前端镜像一致), 枚举值 lowercase
         let raw = std::fs::read_to_string(&file).unwrap();
         assert!(raw.contains("editorFontSize"));
         assert!(raw.contains("closeBehavior"));
+        assert!(raw.contains("\"light\""));
+        assert!(raw.contains("\"en\""));
         std::fs::remove_dir_all(&dir).ok();
     }
 
