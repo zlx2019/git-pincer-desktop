@@ -4,6 +4,7 @@ mod commands;
 pub mod error;
 pub mod merge;
 pub mod repo;
+pub mod settings;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -59,6 +60,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            commands::get_settings,
+            commands::set_settings,
             commands::set_window_form,
             commands::repo_open,
             commands::conflicts,
@@ -76,14 +79,22 @@ pub fn run() {
             commands::commits,
         ])
         .setup(|app| {
+            // 设置先于一切 UI 逻辑加载(关窗行为等在事件回调里同步读取)
+            if let Some(file) = commands::settings_file(app.handle()) {
+                app.state::<commands::AppState>()
+                    .init_settings(settings::Settings::load(&file));
+            }
             build_tray(app)?;
             Ok(())
         })
         .on_window_event(|window, event| {
-            // 关窗不退出: 拦截关闭请求隐藏窗口(会话状态原样保留), 真正退出走托盘"退出"或 ⌘Q
+            // 关窗行为由设置决定: 收进托盘(默认, 会话状态原样保留)或直接退出
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                let state = window.app_handle().state::<commands::AppState>();
+                if state.close_to_tray() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .build(tauri::generate_context!());

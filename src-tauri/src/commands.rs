@@ -10,15 +10,33 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::error::ShellError;
 use crate::merge::MergeSnapshot;
 use crate::repo::{Branch, CommitInfo, FileRow, LaunchKind, Op, PickSide, Repo, ThreeWay};
+use crate::settings::{CloseBehavior, Settings};
 
 /// 最近仓库列表的最大长度
 const RECENT_LIMIT: usize = 10;
 
-/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态
+/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态 + 用户设置(启动时从盘加载)
 #[derive(Default)]
 pub struct AppState {
     repo: Mutex<Option<Repo>>,
     win_form: Mutex<Option<WinForm>>,
+    settings: Mutex<Settings>,
+}
+
+impl AppState {
+    /// 启动时注入从盘上读到的设置(setup 阶段调用一次)
+    pub fn init_settings(&self, s: Settings) {
+        *self.settings.lock().unwrap_or_else(|e| e.into_inner()) = s;
+    }
+
+    /// 关窗是否收进托盘(lib.rs 的关闭拦截按此分流)
+    pub fn close_to_tray(&self) -> bool {
+        self.settings
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .close_behavior
+            == CloseBehavior::Tray
+    }
 }
 
 /// 窗口形态(路由决定): 小窗 = 打开页/菜单, 大窗 = 冲突列表/三栏
@@ -120,6 +138,32 @@ pub async fn set_window_form(
         .map_err(join_err)?;
     win.center().map_err(join_err)?;
     Ok(())
+}
+
+/// 当前用户设置
+#[tauri::command]
+pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, ShellError> {
+    Ok(state
+        .settings
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone())
+}
+
+/// 更新设置: 归一化 → 内存 → 落盘; 返回归一化结果供前端回同步
+#[tauri::command]
+pub async fn set_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: Settings,
+) -> Result<Settings, ShellError> {
+    let s = settings.normalized();
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = s.clone();
+    let file = settings_file(&app)
+        .ok_or_else(|| ShellError::Internal("cannot resolve app data dir".into()))?;
+    s.save(&file)
+        .map_err(|e| ShellError::Internal(format!("failed to write settings: {e}")))?;
+    Ok(s)
 }
 
 /// 打开新仓库(path 有值)或重探当前仓库(path 为空), 返回概要
@@ -363,6 +407,11 @@ fn recent_file(app: &AppHandle) -> Option<std::path::PathBuf> {
     let dir = app.path().app_data_dir().ok()?;
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir.join("recent.json"))
+}
+
+/// 用户设置的存储文件路径(app-data 目录, 应用更新/重装不受影响)
+pub fn settings_file(app: &AppHandle) -> Option<std::path::PathBuf> {
+    Some(app.path().app_data_dir().ok()?.join("settings.json"))
 }
 
 /// 读取最近仓库列表; 任何失败都按空列表处理(尽力而为)
