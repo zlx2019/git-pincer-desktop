@@ -5,7 +5,6 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { api } from '$lib/api';
-  import { t } from '$lib/i18n.svelte';
   import { session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
@@ -75,7 +74,6 @@
     <h1 class="logo mono">PINCER</h1>
     <p class="tagline">IDEA-style Git conflict resolver</p>
     <button class="primary" disabled={opening} onclick={pickAndOpen}>Open Repository…</button>
-    <p class="hint">{t('open-hint')}</p>
   </div>
 
   {#if recent.length}
@@ -139,12 +137,6 @@
   .primary:hover:not(:disabled) {
     background: #2f63d6;
     border-color: #2f63d6;
-  }
-
-  .hint {
-    color: var(--d-dimmer);
-    font-size: 11px;
-    margin: 2px 0 0;
   }
 
   .recent {

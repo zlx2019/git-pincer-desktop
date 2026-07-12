@@ -6,9 +6,6 @@ import type { Language } from './api';
 
 /** [zh, en] 词条表 */
 export const dict = {
-  // 打开页
-  'open-hint': ['…或把仓库文件夹拖进这个窗口', '…or drop a repository folder onto this window'],
-
   // 菜单: 品牌行 / 指令行
   'brand-sub': ['指令面板', 'Command palette'],
   'act-pull': ['拉取远端', 'Pull remote'],
