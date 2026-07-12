@@ -397,6 +397,12 @@
     margin-top: 12px;
   }
 
+  /* 按钮永不折行也不被挤瘪; 空间不足时由 .hint 换行让位 */
+  footer button {
+    flex: none;
+    white-space: nowrap;
+  }
+
   footer button:not(.primary) {
     background: transparent;
     border-color: var(--d-border-strong);
@@ -409,6 +415,7 @@
 
   .hint {
     font-size: 11px;
+    min-width: 0;
   }
 
   /* 三栏编辑器随路由新建, 相关设置非即时生效: 界面页签内注明避免"没反应"误判 */

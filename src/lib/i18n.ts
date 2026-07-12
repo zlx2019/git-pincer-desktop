@@ -62,10 +62,10 @@ export const dict = {
   'set-font-custom': ['自定义…', 'Custom…'],
   'set-font-ph': ['输入字体名, 如 Menlo', 'Font name, e.g. Menlo'],
   'set-close': ['关闭窗口时', 'On window close'],
-  'set-close-tray': ['收进托盘', 'Hide to tray'],
+  'set-close-tray': ['最小化', 'Minimize'],
   'set-close-quit': ['退出应用', 'Quit app'],
   'set-words': ['词级强调默认开启', 'Highlight words by default'],
-  'set-reset': ['恢复默认', 'Reset to defaults'],
+  'set-reset': ['恢复默认', 'Reset'],
   'set-hint': ['即改即存 · 保存在本机', 'Saved locally as you change'],
   'set-done': ['完成', 'Done'],
   'set-editor-note': [
