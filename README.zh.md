@@ -39,7 +39,7 @@ Tauri 2 · SvelteKit (Svelte 5) · CodeMirror 6 · 合并引擎在 Rust (`simila
 当前产物**未做代码签名**, 首次打开需要手动放行 (不是损坏, 是没花钱买证书):
 
 - **macOS**: 提示"已损坏/无法验证开发者"时, 右键 App → 打开; 仍不行则执行
-  `xattr -dr com.apple.quarantine /Applications/git-pincer-desktop.app`
+  `xattr -dr com.apple.quarantine /Applications/PINCER.app`
 - **Windows**: SmartScreen 拦截时点 "更多信息 → 仍要运行"
 - **Linux**: AppImage 先 `chmod +x` 再运行
 

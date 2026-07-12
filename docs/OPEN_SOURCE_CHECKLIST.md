@@ -43,7 +43,7 @@ cliff 目前只在打 tag 时生成 release notes, 仓库里没有可浏览的�
 没有付费开发者账号前, 下载的 dmg 会提示"已损坏/无法验证开发者", exe 会被 SmartScreen 拦。
 这不是 bug, 但**必须写出来**, 否则第一批用户直接流失:
 
-- README 安装节写明: macOS 右键 → 打开, 或 `xattr -dr com.apple.quarantine /Applications/git-pincer-desktop.app`;
+- README 安装节写明: macOS 右键 → 打开, 或 `xattr -dr com.apple.quarantine /Applications/PINCER.app`;
   Windows 点"更多信息 → 仍要运行";
 - 长期项: Apple Developer ID 签名 + 公证 (release.yml 已是矩阵, 加签名步骤即可, 需账号与证书 secrets),
   Windows 代码签名证书 (成本更高, 可后置)。
@@ -123,7 +123,7 @@ Tauri/Rust 社区受众大半英文。推荐 `README.md` 英文为主 (国际默
 | 自动更新 | `tauri-plugin-updater` + release.yml 产 `latest.json`; 桌面工具的留存关键。需要 updater 签名密钥对, 建议 P0 做完就排上 |
 | dmg 安装体验 | tauri dmg 配置支持背景图 + 图标摆位 (`bundle.macOS.dmg`), 一张 "拖到 Applications" 的深色背景图即可 |
 | About 面板 | ✅ (2026-07-12) 设置对话框内置关于块: PINCER 字标 + 版本(getVersion) + 项目主页(opener) + 许可/隐私行 + 致谢行 |
-| 产品显示名 | `productName` 目前是 `git-pincer-desktop`, .app/菜单栏就叫这个; 若想显示 "PINCER" 需改 productName (影响产物文件名, 发布前定, 之后别动) |
+| 产品显示名 | ✅ (2026-07-12 Zero 定) `product-name = "PINCER"`——.app/菜单栏/安装列表/产物文件名统一品牌名; 窗口 title 与托盘 tooltip 同步对齐 |
 | issue 表单化 | ❌ 不做 (2026-07-12 Zero 定, 维持现有 .md 模板) |
 | FUNDING.yml | 想接受赞助就加 (GitHub Sponsors / 爱发电), 不想就跳过 |
 | 隐私一句话 | ✅ (2026-07-12) README 已写明 "不联网、无遥测、git 凭据走你本机配置" |

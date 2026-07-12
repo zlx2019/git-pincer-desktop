@@ -54,7 +54,7 @@ Current builds are **not code-signed**, so the first launch needs a manual bypas
 broken — there is simply no paid certificate):
 
 - **macOS**: on "damaged / unidentified developer", right-click the app → Open; if that fails run
-  `xattr -dr com.apple.quarantine /Applications/git-pincer-desktop.app`
+  `xattr -dr com.apple.quarantine /Applications/PINCER.app`
 - **Windows**: when SmartScreen blocks, click "More info → Run anyway"
 - **Linux**: `chmod +x` the AppImage before running
 

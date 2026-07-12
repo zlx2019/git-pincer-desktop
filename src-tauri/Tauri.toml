@@ -2,7 +2,7 @@
 # 键名按官方惯例 kebab-case, 解析依赖 tauri / tauri-build 的 config-toml feature。
 # 字段参考: https://tauri.app/reference/config/
 
-product-name = "git-pincer-desktop"
+product-name = "PINCER"
 version = "0.1.0"
 identifier = "io.github.zlx2019.gitpincer"
 
@@ -15,7 +15,7 @@ frontend-dist = "../build"
 # 防启动白闪: visible=false 起窗 + 原生暗底色/暗主题, 前端首帧后再 show()
 [[app.windows]]
 label = "main"
-title = "git-pincer"
+title = "PINCER"
 width = 420
 height = 640
 min-width = 380
