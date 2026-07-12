@@ -2,7 +2,7 @@
   <img src="assets/banner.svg" alt="PINCER — IDEA-style Git conflict resolver" />
 </p>
 
-# PINCER · git-pincer-desktop
+# PINCER
 
 [![CI](https://github.com/zlx2019/git-pincer-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/zlx2019/git-pincer-desktop/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/zlx2019/git-pincer-desktop?include_prereleases)](https://github.com/zlx2019/git-pincer-desktop/releases)
@@ -53,7 +53,7 @@ Grab the artifact for your platform from
 Current builds are **not code-signed**, so the first launch needs a manual bypass:
 
 - **macOS**: right-click the app → Open; if that fails run
-  `xattr -dr com.apple.quarantine /Applications/PINCER.app`
+  `xattr -dr com.apple.quarantine /Applications/Pincer.app`
 - **Windows**: when SmartScreen blocks, click "More info → Run anyway"
 - **Linux**: `chmod +x` the AppImage before running
 

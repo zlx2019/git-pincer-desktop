@@ -2,7 +2,7 @@
 # 键名按官方惯例 kebab-case, 解析依赖 tauri / tauri-build 的 config-toml feature。
 # 字段参考: https://tauri.app/reference/config/
 
-product-name = "PINCER"
+product-name = "Pincer"
 version = "../package.json"
 identifier = "io.github.zlx2019.gitpincer"
 
@@ -20,7 +20,7 @@ remove-unused-commands = true
 # 页面被挂起, 长操作的终端输出会断流, disabled 保持隐藏期间 JS 照常运行
 [[app.windows]]
 label = "main"
-title = "PINCER"
+title = "Pincer"
 width = 420
 height = 640
 min-width = 380
@@ -47,7 +47,7 @@ homepage = "https://github.com/zlx2019/git-pincer-desktop"
 license = "MIT"
 license-file = "../LICENSE"
 short-description = "IDEA-style Git conflict resolver"
-long-description = "PINCER — resolve Git merge conflicts in an IDEA-style three-pane editor. Launch pull / merge / rebase / cherry-pick / revert and take over conflicts the moment they appear."
+long-description = "Pincer — resolve Git merge conflicts in an IDEA-style three-pane editor. Launch pull / merge / rebase / cherry-pick / revert and take over conflicts the moment they appear."
 icon = [
   "icons/32x32.png",
   "icons/128x128.png",

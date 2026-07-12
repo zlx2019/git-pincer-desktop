@@ -2,7 +2,7 @@
   <img src="assets/banner.svg" alt="PINCER — IDEA-style Git conflict resolver" />
 </p>
 
-# PINCER · git-pincer-desktop
+# PINCER
 
 [![CI](https://github.com/zlx2019/git-pincer-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/zlx2019/git-pincer-desktop/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/zlx2019/git-pincer-desktop?include_prereleases)](https://github.com/zlx2019/git-pincer-desktop/releases)
@@ -46,7 +46,7 @@
 当前产物**未做代码签名**, 首次打开需要手动放行:
 
 - **macOS**: 右键 App → 打开; 仍不行则执行
-  `xattr -dr com.apple.quarantine /Applications/PINCER.app`
+  `xattr -dr com.apple.quarantine /Applications/Pincer.app`
 - **Windows**: SmartScreen 拦截时点 "更多信息 → 仍要运行"
 - **Linux**: AppImage 先 `chmod +x` 再运行
 
