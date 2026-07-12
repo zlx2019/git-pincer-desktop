@@ -1,6 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="84 84 856 856">
   <!-- PINCER 托盘图标 v2 (macOS template): 与 icon.svg 同构型的纯黑剪影——
-       圆盘镂空 merge 分叉图 + 外圈刻度; 系统随亮暗菜单栏/选中态自动反色 -->
+       圆盘镂空 merge 分叉图 + 外圈刻度; 系统随亮暗菜单栏/选中态自动反色。
+       viewBox 裁到图形略留呼吸边(图形 700/856 ≈ 82%): 44px(22pt@2x) 画布里内容
+       合 ~18pt, 与系统菜单栏图标同视觉尺寸; 满幅 1024 画布时只合 ~15pt, 偏小 -->
   <mask id="g">
     <rect width="1024" height="1024" fill="#fff"/>
     <g stroke="#000" stroke-width="34" stroke-linecap="round">
