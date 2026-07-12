@@ -16,9 +16,7 @@
 > precision and control. May it grip both sides of every conflict firmly and carry the merge
 > through.
 
-The desktop sibling of [git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI), for when
-you'd rather resolve conflicts in a real window: launch an operation, take over the conflicts,
-resolve them in three panes, continue — no log, no commit, no push.
+The desktop version of [git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI).
 
 <!-- TODO(before first release): screenshots in assets/screenshots/ — compact palette + three-pane merge, ideally a main-flow GIF -->
 

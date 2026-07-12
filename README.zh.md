@@ -15,8 +15,7 @@
 > 而蟹钳意味着稳定、精准与掌控。愿它像一把可靠的钳子, 牢牢夹住每一处冲突的两侧,
 > 帮你更高效地理解差异、完成合并。
 
-[git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI) 的桌面端姊妹项目, 给想在真正的
-窗口里解冲突的时刻: 发起操作、接管冲突、三栏解决、continue——不做 log、不做 commit、不做 push。
+[git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI) 的桌面端版本。
 
 <!-- TODO(首个 release 前): assets/screenshots/ 补 菜单小窗 + 三栏大窗 截图, 更好是一张主流程 GIF -->
 
