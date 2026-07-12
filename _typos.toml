@@ -52,3 +52,4 @@ thiserror = "thiserror"
 # 本项目术语
 pincer = "pincer"
 rerere = "rerere"
+mis = "mis"
