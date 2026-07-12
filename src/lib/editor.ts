@@ -232,6 +232,32 @@ export function linkScroll(panes: { view: EditorView; anchors: number[] }[]): ()
   };
 }
 
+/** 同像素横向同步滚动(三栏 + 底部共享横条, IDEA 式); 返回解绑函数。
+    传播绝对 scrollLeft(等宽字体下代码列跨栏对齐), 目标按自身上限被浏览器夹取。
+    以"横向增量为零直接返回"做守卫: 既吞掉程序写入的回声(写后把实际值预记进 last),
+    也避免纯纵向滚动时, 被夹取到较小上限的栏把其他栏反向拽回 */
+export function linkHScroll(els: HTMLElement[]): () => void {
+  const last = new Map<HTMLElement, number>();
+  const handlers: [HTMLElement, () => void][] = [];
+  for (const el of els) {
+    const handler = () => {
+      const x = el.scrollLeft;
+      if (Math.abs(x - (last.get(el) ?? 0)) < 1) return;
+      last.set(el, x);
+      for (const dst of els) {
+        if (dst === el || Math.abs(dst.scrollLeft - x) < 1) continue;
+        dst.scrollLeft = x;
+        last.set(dst, dst.scrollLeft);
+      }
+    };
+    el.addEventListener('scroll', handler, { passive: true });
+    handlers.push([el, handler]);
+  }
+  return () => {
+    for (const [el, handler] of handlers) el.removeEventListener('scroll', handler);
+  };
+}
+
 /** 定位 line 所在的锚点段索引 */
 function locate(anchors: number[], line: number): number {
   let k = 0;

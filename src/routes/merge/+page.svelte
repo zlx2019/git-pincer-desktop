@@ -30,6 +30,7 @@
     createPane,
     languageFor,
     lineRangeToPos,
+    linkHScroll,
     linkScroll,
     readonlyExtensions,
     type Pane,
@@ -80,6 +81,11 @@
   let rightEl: HTMLElement | undefined = $state();
   let views: EditorView[] = [];
   let unlink: (() => void) | null = null;
+  let unlinkH: (() => void) | null = null;
+  let hbarEl: HTMLDivElement | undefined = $state();
+  let hspacerEl: HTMLDivElement | undefined = $state();
+  /** 三栏存在横向溢出(底部共享横条仅此时可见) */
+  let hOn = $state(false);
   let leftLines: string[] = [];
   let rightLines: string[] = [];
   let baseLines: string[] = [];
@@ -154,6 +160,7 @@
     load();
     return () => {
       unlink?.();
+      unlinkH?.();
       for (const v of views) {
         v.scrollDOM.removeEventListener('scroll', bumpTick);
         v.destroy();
@@ -168,8 +175,23 @@
     rafPending = true;
     requestAnimationFrame(() => {
       rafPending = false;
+      syncHBar();
       scrollTick += 1;
     });
+  }
+
+  /** 底部共享横条校准: 撑杆宽 = 横条视宽 + 三栏最大可滚距离(scrollLeft 1:1 像素映射);
+      三栏都无横向溢出时隐藏(visibility 隐藏保留占位, 不跳布局)。CM6 只渲染视口行,
+      scrollWidth 随更宽的行进入渲染窗口而增长——本函数挂在 bumpTick 的 rAF 里,
+      滚动/几何变化逐帧收敛, 无需一次算准 */
+  function syncHBar() {
+    if (!hbarEl || !hspacerEl || !views.length) return;
+    let max = 0;
+    for (const v of views) {
+      max = Math.max(max, v.scrollDOM.scrollWidth - v.scrollDOM.clientWidth);
+    }
+    hOn = max >= 1;
+    hspacerEl.style.width = `${hbarEl.clientWidth + max}px`;
   }
 
   /** 接缝不是滚动容器: 滚轮转发给中栏(同步联动其余两栏) */
@@ -233,8 +255,10 @@
       ]);
       // CM6 的 update 周期滞后于原生滚动, 接缝几何直接跟 scroll 事件逐帧走
       for (const v of views) v.scrollDOM.addEventListener('scroll', bumpTick, { passive: true });
+      if (hbarEl) unlinkH = linkHScroll([...views.map((v) => v.scrollDOM), hbarEl]);
       mounted = true;
       refreshDecos();
+      syncHBar();
     } catch (e) {
       toast(String(e));
     }
@@ -660,6 +684,10 @@
       </div>
     </div>
 
+    <div class="hbar" class:on={hOn} bind:this={hbarEl} aria-hidden="true">
+      <div class="hspacer" bind:this={hspacerEl}></div>
+    </div>
+
     <footer>
       <button onclick={() => acceptWhole('ours')}>Accept Left</button>
       <button onclick={() => acceptWhole('theirs')}>Accept Right</button>
@@ -692,6 +720,45 @@
   }
 
   header,
+  /* 底部共享横向滚动条(IDEA 式): 一根条经 linkHScroll 同步驱动三栏 scrollLeft;
+     滚动条强制经典绘制(::-webkit-scrollbar)——macOS overlay 滚条不滚不现身, 失去"可发现性" */
+  .hbar {
+    flex: none;
+    height: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    visibility: hidden;
+    background: var(--d-canvas);
+    border-top: 1px solid var(--d-border);
+  }
+
+  .hbar.on {
+    visibility: visible;
+  }
+
+  .hspacer {
+    height: 1px;
+  }
+
+  .hbar::-webkit-scrollbar {
+    height: 12px;
+  }
+
+  .hbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .hbar::-webkit-scrollbar-thumb {
+    background: var(--d-border-strong);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 6px;
+  }
+
+  .hbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--d-dimmer);
+  }
+
   footer {
     display: flex;
     align-items: center;

@@ -139,6 +139,7 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 | 接缝条 ×2 | **44px**(2026-07-11 定稿, 原 ~28px)竖条内嵌 SVG: 每个可见 chunk 画 侧栏区间→Result区间 贝塞尔封闭带 (同底色, 控制点在两端 30% 处成 IDEA 斜扫); ✕ / ≫ / ≪ 按钮浮于其上; 滚动/编辑 rAF 节流重绘; 几何统一在 seamGeoms 每帧算一次(坐标基准每栏只读一次, 布局读取集中在模板写入前), y 坐标取自 `lineBlockAt`; 按中栏 viewport 粗筛, 屏外 chunk 不算不画 |
 | gutter 按钮 | 左栏块 `✕ ≫`、右栏块 `≪ ✕` 镜像; hover 显示 tooltip; applied 后变 undo 图标 |
 | 同步滚动 | 以 chunk 三栏区间起始行为锚点分段线性插值 × 行高; 程序写入的 scrollTop 逐目标记账, 目标栏的回声 scroll 事件直接吞掉(2026-07-12 定, 原 rAF 全局锁有 1px 抖动) |
+| 底部横向滚动条 | 一根共享横条(IDEA 式, 2026-07-12 Zero 定)驱动三栏 scrollLeft 同像素联动(等宽字体下代码列跨栏对齐, 各栏按自身上限夹取); `linkHScroll` 用"横向增量为零即返回"守卫——兼吞程序回声、防纵向滚动把被夹取的栏反拽; 撑杆宽 = 条视宽 + 三栏最大可滚距, 在 bumpTick 的 rAF 里逐帧收敛(CM6 只渲染视口行, scrollWidth 随渲染增长); 无横向溢出时 visibility 隐藏(保留占位不跳布局) |
 | overview ruler | 最右 ~12px: 全文 chunk 色块缩略(实时区间换算, 编辑后不漂移), 点击按滚动高度比例跳转 |
 | 顶栏 | ↑↓ 上/下一个 change (自动滚三栏); ⋙ 组 = 批量应用非冲突 (Left/All/Right); Highlight words ▾ = words/none 切换 |
 | 底栏 | Accept Left/Right = 整文件取侧; Cancel = 放弃本文件改动回列表; **Apply** = Result 全文 `save_result` 后回列表刷新 |
