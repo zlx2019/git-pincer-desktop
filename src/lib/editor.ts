@@ -24,10 +24,11 @@ export const ideaTheme = EditorView.theme(
       backgroundColor: 'var(--d-canvas)',
       color: 'var(--d-text)',
       height: '100%',
-      fontSize: '12px',
+      // 字号/字体走设置系统的可覆盖变量(进入 /merge 时编辑器新建, 取当次值)
+      fontSize: 'var(--editor-font-size, 12px)',
     },
     '.cm-scroller': {
-      fontFamily: 'var(--font-mono)',
+      fontFamily: 'var(--editor-font-family, var(--font-mono))',
       lineHeight: '1.6',
       overflow: 'auto',
       // 三栏同步滚动, 原生滚动条只剩噪音: 全部隐藏, 导航交给滚轮与 overview ruler

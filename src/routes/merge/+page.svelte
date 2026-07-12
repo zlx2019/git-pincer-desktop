@@ -21,6 +21,7 @@
     type ChunkState,
   } from '$lib/chunks';
   import { session } from '$lib/state.svelte';
+  import { settings } from '$lib/settings.svelte';
   import { toast } from '$lib/toast.svelte';
   import { largeWindow } from '$lib/win';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -65,7 +66,8 @@
   };
 
   let snap: MergeSnapshot | null = $state(null);
-  let showWords = $state(true);
+  // 初值取设置的默认开关; 页内 toggle 只影响本次会话, 不写回设置
+  let showWords = $state(settings.value.highlightWords);
   let applyAsk = $state(false);
   let states = $state<ChunkState[]>([]);
   let resultRanges = $state<{ from: number; to: number }[]>([]);

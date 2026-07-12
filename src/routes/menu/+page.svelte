@@ -10,6 +10,7 @@
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
   import PickerDialog from '$lib/components/PickerDialog.svelte';
+  import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 
   interface DialogSpec {
     kind: LaunchKind;
@@ -24,6 +25,7 @@
   let dialog: DialogSpec | null = $state(null);
   let switchItems: { id: string; label: string; sublabel?: string; disabled?: boolean }[] | null =
     $state(null);
+  let settingsOpen = $state(false);
   let termEl: HTMLElement | undefined = $state();
 
   // 图标为静态字面量, {@html} 安全
@@ -153,7 +155,7 @@
 
   /** ⌘/Ctrl + 1..5 触发对应操作 */
   function hotkey(e: KeyboardEvent) {
-    if (!(e.metaKey || e.ctrlKey) || dialog || switchItems || running) return;
+    if (!(e.metaKey || e.ctrlKey) || dialog || switchItems || settingsOpen || running) return;
     const idx = ['1', '2', '3', '4', '5'].indexOf(e.key);
     if (idx >= 0) {
       e.preventDefault();
@@ -294,6 +296,12 @@
           <path d="M1.5 4.5a1 1 0 0 1 1-1h3l1.5 1.8h6.5a1 1 0 0 1 1 1v1.2M3.5 13.5l1.6-5h9.9l-1.6 5z" />
         </svg>
       </button>
+      <button class="iconbtn gear" title="设置" onclick={() => (settingsOpen = true)}>
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+          <circle cx="8" cy="8" r="2.4" />
+          <path d="M8 1.6v2.1M8 12.3v2.1M1.6 8h2.1M12.3 8h2.1M3.5 3.5 5 5M11 11l1.5 1.5M12.5 3.5 11 5M5 11l-1.5 1.5" />
+        </svg>
+      </button>
     </div>
 
     <div class="body">
@@ -413,6 +421,10 @@
   />
 {/if}
 
+{#if settingsOpen}
+  <SettingsDialog onclose={() => (settingsOpen = false)} />
+{/if}
+
 <style>
   .win {
     height: 100vh;
@@ -488,6 +500,11 @@
   .iconbtn:hover {
     background: var(--d-hover);
     color: var(--d-text);
+  }
+
+  /* 仅首个图标按钮吃右推 margin, 后续的贴排(topbar 的 gap 提供间距) */
+  .iconbtn + .iconbtn {
+    margin-left: 0;
   }
 
   /* ── 指令面板 ──────────────────────────── */

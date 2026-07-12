@@ -4,11 +4,14 @@
   import { onMount } from 'svelte';
   import { dev } from '$app/environment';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { loadSettings } from '$lib/settings.svelte';
   import { toasts } from '$lib/toast.svelte';
 
   let { children } = $props();
 
   onMount(() => {
+    // 用户设置(字号/字体等 CSS 变量)先行加载, 与首帧显示并行
+    loadSettings();
     // 窗口配置 visible:false: 首帧绘制完成后再显示, 启动不再闪白底/无样式内容
     requestAnimationFrame(() => {
       const win = getCurrentWindow();

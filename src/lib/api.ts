@@ -17,6 +17,21 @@ export interface RepoInfo {
 /** 可从菜单发起的操作 */
 export type LaunchKind = 'pull' | 'merge' | 'rebase' | 'cherry-pick' | 'revert';
 
+/** 关闭窗口时的行为 */
+export type CloseBehavior = 'tray' | 'quit';
+
+/** 用户设置(与 Rust settings.rs 严格镜像; 存 app-data/settings.json, 跨版本保留) */
+export interface Settings {
+  /** 编辑器字号(px), Rust 侧钳制 8–32 */
+  editorFontSize: number;
+  /** 编辑器等宽字体名; 空串 = 内嵌 JetBrains Mono */
+  editorFontFamily: string;
+  /** 关闭窗口时的行为 */
+  closeBehavior: CloseBehavior;
+  /** 三栏词级强调的默认开关 */
+  highlightWords: boolean;
+}
+
 /** 发起操作的结果 */
 export type LaunchOutcome =
   | { kind: 'cleanDone' }
@@ -98,6 +113,8 @@ export interface OutputLine {
 
 /** 壳层命令封装 */
 export const api = {
+  getSettings: () => invoke<Settings>('get_settings'),
+  setSettings: (settings: Settings) => invoke<Settings>('set_settings', { settings }),
   repoOpen: (path?: string) => invoke<RepoInfo>('repo_open', { path: path ?? null }),
   conflicts: () => invoke<FileRow[]>('conflicts'),
   readThree: (path: string) => invoke<ThreeWay>('read_three', { path }),

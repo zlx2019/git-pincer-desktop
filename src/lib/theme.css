@@ -19,6 +19,10 @@
   --font-ui: -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
 
+  /* 编辑器专用变量: 设置系统(settings.svelte.ts)在 documentElement 上内联覆盖 */
+  --editor-font-size: 12px;
+  --editor-font-family: var(--font-mono);
+
   --d-canvas: #1e1f22;
   --d-panel: #2b2d30;
   --d-border: #393b40;
