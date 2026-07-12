@@ -44,7 +44,7 @@ cliff 目前只在打 tag 时生成 release notes, 仓库里没有可浏览的�
 - 长期项: Apple Developer ID 签名 + 公证 (release.yml 已是矩阵, 加签名步骤即可, 需账号与证书 secrets),
   Windows 代码签名证书 (成本更高, 可后置)。
 
-### 1.4 bundle 元数据补全 (`src-tauri/tauri.conf.json`)
+### 1.4 bundle 元数据补全 (`src-tauri/Tauri.toml`)
 Linux 包管理器与 Windows 安装器会展示这些字段, 现在只有 category:
 
 ```jsonc
@@ -60,7 +60,7 @@ Linux 包管理器与 Windows 安装器会展示这些字段, 现在只有 categ
 社区标配三件套的最后一件 (Contributor Covenant 2.1 模板直接用, GitHub 社区检查项会亮绿)。
 
 ### 1.6 版本号三处同步的发布流程
-`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` 三处版本要一致。
+`package.json` / `src-tauri/Cargo.toml` / `src-tauri/Tauri.toml` 三处版本要一致。
 在 CONTRIBUTING 或 README 写死发布流程:
 
 ```bash

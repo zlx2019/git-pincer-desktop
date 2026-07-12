@@ -1,0 +1,44 @@
+# Tauri 配置(2026-07-12 由 tauri.conf.json 迁移为 TOML):
+# 键名按官方惯例 kebab-case, 解析依赖 tauri / tauri-build 的 config-toml feature。
+# 字段参考: https://tauri.app/reference/config/
+
+product-name = "git-pincer-desktop"
+version = "0.1.0"
+identifier = "io.github.zlx2019.gitpincer"
+
+[build]
+before-dev-command = "pnpm dev"
+dev-url = "http://localhost:1420"
+before-build-command = "pnpm build"
+frontend-dist = "../build"
+
+# 防启动白闪: visible=false 起窗 + 原生暗底色/暗主题, 前端首帧后再 show()
+[[app.windows]]
+label = "main"
+title = "git-pincer"
+width = 420
+height = 640
+min-width = 380
+min-height = 520
+center = true
+visible = false
+accept-first-mouse = true
+background-color = "#1e1f22"
+theme = "Dark"
+
+# csp 不写 = 原 JSON 的 null(TOML 无 null 字面量)
+[app.security]
+
+[bundle]
+active = true
+targets = "all"
+category = "DeveloperTool"
+short-description = "IDEA-style Git conflict resolver"
+long-description = "PINCER — resolve Git merge conflicts in an IDEA-style three-pane editor. Launch pull / merge / rebase / cherry-pick / revert and take over conflicts the moment they appear."
+icon = [
+  "icons/32x32.png",
+  "icons/128x128.png",
+  "icons/128x128@2x.png",
+  "icons/icon.icns",
+  "icons/icon.ico",
+]
