@@ -11,13 +11,12 @@
 
 [English](README.md) | **简体中文**
 
-> **PINCER** —— IDEA 风格的 Git 冲突解决桌面端, [git-pincer](https://github.com/zlx2019/git-pincer)
-> (CLI/TUI) 的 GUI 姊妹项目: 功能对齐、take 语义一致, 以 Tauri 2 · Svelte 5 · CodeMirror 6
-> 独立实现, 合并引擎在 Rust。
+> **PINCER** 名字取自 Rust 的吉祥物——螃蟹。Git 冲突就像两个分支同时"夹"住同一段代码,
+> 而蟹钳意味着稳定、精准与掌控。愿它像一把可靠的钳子, 牢牢夹住每一处冲突的两侧,
+> 帮你更高效地理解差异、完成合并。
 
-它只做一件事——解冲突这一刻。在小窗指令面板发起 `pull / merge / rebase / cherry-pick / revert`
-(或者在你自己的终端里发起: 冲突一出现应用立刻接管), 过一遍冲突文件列表, 在三栏编辑器里解决,
-continue。不做 log、不做 commit、不做 push。
+[git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI) 的桌面端姊妹项目, 给想在真正的
+窗口里解冲突的时刻: 发起操作、接管冲突、三栏解决、continue——不做 log、不做 commit、不做 push。
 
 <!-- TODO(首个 release 前): assets/screenshots/ 补 菜单小窗 + 三栏大窗 截图, 更好是一张主流程 GIF -->
 

@@ -11,14 +11,14 @@
 
 **English** | [简体中文](README.zh.md)
 
-> **PINCER** — an IDEA-style Git conflict resolver for the desktop, the GUI sibling of
-> [git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI): same feature set and the same
-> take semantics, independently built with Tauri 2 · Svelte 5 · CodeMirror 6, merge engine in Rust.
+> **PINCER** takes its name from Rust's mascot — the crab. A Git conflict is two branches
+> pinching the same piece of code at the same time, while a crab's pincer stands for stability,
+> precision and control. May it grip both sides of every conflict firmly and carry the merge
+> through.
 
-It does one thing — the conflict moment. Launch `pull / merge / rebase / cherry-pick / revert`
-from a compact palette (or from your terminal: the app takes over the instant conflicts appear),
-review the conflicted files, resolve them in a three-pane editor, continue. No log, no commit,
-no push.
+The desktop sibling of [git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI), for when
+you'd rather resolve conflicts in a real window: launch an operation, take over the conflicts,
+resolve them in three panes, continue — no log, no commit, no push.
 
 <!-- TODO(before first release): screenshots in assets/screenshots/ — compact palette + three-pane merge, ideally a main-flow GIF -->
 
