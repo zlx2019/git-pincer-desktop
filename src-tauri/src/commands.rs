@@ -55,7 +55,8 @@ impl AppState {
         *self.tray.lock().unwrap_or_else(|e| e.into_inner()) = Some(items);
     }
 
-    /// 应用菜单"设置"项句柄登记(macOS; 语言切换要就地改文案)
+    /// 应用菜单"设置"项句柄登记(仅 macOS 有应用菜单, 其余平台该方法无调用点)
+    #[cfg(target_os = "macos")]
     pub fn set_menu_settings_item(&self, item: tauri::menu::MenuItem<tauri::Wry>) {
         *self.menu_settings.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
     }
