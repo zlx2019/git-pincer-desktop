@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="PINCER — IDEA-style Git conflict resolver">
+  <!-- GitHub 社交预览图源(1280×640): 横幅同构图垂直居中; 产物 social-preview.png -->
+  <rect width="1280" height="640" fill="#0E1526"/>
+  <g transform="translate(0,160)">
+  <!-- logo mark (源自 icon.svg, 去掉圆角方底直接落在横幅底上) -->
+  <g transform="translate(150,34) scale(0.246)">
+    <g stroke="#FF7A2F" stroke-width="56" stroke-linecap="round">
+      <line x1="512.0" y1="236.0" x2="512.0" y2="194.0"/>
+      <line x1="617.6" y1="257.0" x2="633.7" y2="218.2"/>
+      <line x1="707.2" y1="316.8" x2="736.9" y2="287.1"/>
+      <line x1="767.0" y1="406.4" x2="805.8" y2="390.3"/>
+      <line x1="788.0" y1="512.0" x2="830.0" y2="512.0"/>
+      <line x1="767.0" y1="617.6" x2="805.8" y2="633.7"/>
+      <line x1="707.2" y1="707.2" x2="736.9" y2="736.9"/>
+      <line x1="617.6" y1="767.0" x2="633.7" y2="805.8"/>
+      <line x1="512.0" y1="788.0" x2="512.0" y2="830.0"/>
+      <line x1="406.4" y1="767.0" x2="390.3" y2="805.8"/>
+      <line x1="316.8" y1="707.2" x2="287.1" y2="736.9"/>
+      <line x1="257.0" y1="617.6" x2="218.2" y2="633.7"/>
+      <line x1="236.0" y1="512.0" x2="194.0" y2="512.0"/>
+      <line x1="257.0" y1="406.4" x2="218.2" y2="390.3"/>
+      <line x1="316.8" y1="316.8" x2="287.1" y2="287.1"/>
+      <line x1="406.4" y1="257.0" x2="390.3" y2="218.2"/>
+    </g>
+    <circle cx="512" cy="512" r="300" fill="#FF7A2F"/>
+    <g stroke="#0E1526" stroke-width="30" stroke-linecap="round">
+      <line x1="414" y1="660" x2="512" y2="548"/>
+      <line x1="610" y1="660" x2="512" y2="548"/>
+      <line x1="512" y1="548" x2="512" y2="352"/>
+    </g>
+    <circle cx="414" cy="660" r="32" fill="#0E1526"/>
+    <circle cx="610" cy="660" r="32" fill="#0E1526"/>
+    <circle cx="512" cy="352" r="40" fill="#0E1526"/>
+    <circle cx="512" cy="548" r="52" fill="#0E1526"/>
+    <circle cx="512" cy="548" r="22" fill="#FF7A2F"/>
+  </g>
+  <!-- 字标与定位语 (系统等宽字体栈: GitHub 内联 SVG 不加载外部字体) -->
+  <g font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">
+    <text x="470" y="152" fill="#FF7A2F" font-size="72" font-weight="700" letter-spacing="18">PINCER</text>
+    <text x="474" y="204" fill="#DFE1E5" font-size="26">IDEA-style Git conflict resolver</text>
+    <text x="474" y="246" fill="#7D818A" font-size="19">pull · merge · rebase · cherry-pick · revert</text>
+  </g>
+</g>
+</svg>

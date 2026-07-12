@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="PINCER — IDEA-style Git conflict resolver" />
+</p>
+
 # PINCER · git-pincer-desktop
 
 [English](README.md) · **简体中文**

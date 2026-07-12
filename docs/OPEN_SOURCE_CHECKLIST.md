@@ -99,7 +99,9 @@ IDEA 的列表是按类型着色图标, 辨识度高很多。做法 (不违反"�
 - 色彩用主题 token 的低饱和版, 不抢冲突红文件名的视觉焦点;
 - 顺手给三栏页 header 的文件名也用上同一枚图标。
 
-### 2.3 README 顶部品牌横幅 + GitHub 社交预览图
+### 2.3 README 顶部品牌横幅 + GitHub 社交预览图 — 🔶 素材完成 (2026-07-12)
+✅ `assets/banner.svg`(1280×320, v2 logo 横排 lockup, 双版 README 顶部已挂) + `assets/social-preview.{svg,png}`(1280×640 同构图);
+⏳ 社图上传要 Zero 在 GitHub Settings → Social preview 操作。
 - README 标题上方放一张横幅 (logo + 一句话定位, 深色底, `assets/banner.svg` 或 png);
 - GitHub 仓库 Settings → Social preview 上传 1280×640 社图 (被分享到任何平台时的门面),
   内容可以就是横幅加一张三栏截图。
