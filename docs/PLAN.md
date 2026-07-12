@@ -61,7 +61,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `launch_op(kind, targets[]) → LaunchOutcome` | 菜单发起五操作; 输出走 `git://output`; 结束探测: 有冲突 → `Conflicts{files}`, 零退出 → `CleanDone`, 否则 `Failed`; 注入 `GIT_TERMINAL_PROMPT=0` 防无终端挂起 |
 | `branches() → Branch[]` | 本地分支(带当前标记), merge/rebase 对话框数据 |
 | `commits(others_only, limit) → CommitInfo[]` | 最近提交; others_only 只列当前分支未包含的(cherry-pick 场景) |
-| `set_window_form(form)` | 窗口形态(compact/large): 最小尺寸/尺寸/定位单 IPC 完成; AppState 缓存已应用形态, 未变直接跳过; 各形态位置本次运行内记忆, 切回原位恢复(不在任何屏幕上则居中), 首次出现居中 |
+| `set_window_form(form)` | 窗口形态(compact/large): 最小尺寸/尺寸/定位单 IPC 完成; AppState 缓存已应用形态, 未变直接跳过; 尺寸 = 记忆值(settings.compactSize/largeSize, 钳到形态最小)或出厂默认; 位置本次运行内记忆, 切回原位恢复(不在任何屏幕上则居中), 首次出现居中 |
 | `get_settings() → Settings` | 用户设置(启动时 setup 从 app-data/settings.json 载入内存) |
 | `set_settings(settings) → Settings` | 归一化(字号钳 8–32, 字体名清洗) → 内存 → 落盘; 返回归一化结果供前端回同步 |
 
@@ -99,7 +99,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 - pull → 直接执行(走当前分支跟踪配置);
 - 结果分流: 出冲突 → 自动切大窗进冲突列表; 干净完成/失败 → 终端 ✔/✘ 尾行留痕。
 
-**窗口策略**: 打开页/菜单 = 紧凑小窗(420×640, min 380×520, 可当桌面侧边小工具); 冲突列表/三栏 = 大窗(1280×800, min 960×640); 路由切换时前端调 `set_window_form` 命令, 最小尺寸/尺寸/定位在 Rust 侧一次完成(单 IPC, 2026-07-12 定, 原为 3 次串行 JS API), **形态未变时直接跳过**——同形态路由间跳转不再把用户移动/调整过的窗口拽回屏幕中心。**形态位置记忆**(2026-07-12 Zero 定): 切换形态时记住旧形态当前位置(仅内存, 不落盘), 该形态本次运行内出现过就原位恢复——冲突处理完/失败/搁置回小窗时回到进大窗前的位置; 恢复前校验位置仍落在某块屏幕内(拔外接屏防丢窗), 否则居中; 首次出现(含应用启动)居中。窗口配置 `visible:false` + 前端首帧后 `show()`(防启动白闪), `backgroundColor` = 画布色 #1e1f22(防 resize 白边), `theme: Dark`(Windows 标题栏恒暗), `acceptFirstMouse: true`(macOS 未聚焦首击即生效)。**关闭窗口不退出**(2026-07-11 Zero 定): 关闭请求被拦截为隐藏, 应用驻留系统托盘——托盘菜单"显示窗口/退出", Windows/Linux 左键单击唤回, macOS 点 Dock 图标重开; 隐藏不销毁 webview, 会话状态原样保留, 真正退出走托盘菜单(或 ⌘Q)。
+**窗口策略**: 打开页/菜单 = 紧凑小窗(420×640, min 380×520, 可当桌面侧边小工具); 冲突列表/三栏 = 大窗(1280×800, min 960×640); 路由切换时前端调 `set_window_form` 命令, 最小尺寸/尺寸/定位在 Rust 侧一次完成(单 IPC, 2026-07-12 定, 原为 3 次串行 JS API), **形态未变时直接跳过**——同形态路由间跳转不再把用户移动/调整过的窗口拽回屏幕中心。**形态位置记忆**(2026-07-12 Zero 定): 切换形态时记住旧形态当前位置(仅内存, 不落盘), 该形态本次运行内出现过就原位恢复——冲突处理完/失败/搁置回小窗时回到进大窗前的位置; 恢复前校验位置仍落在某块屏幕内(拔外接屏防丢窗), 否则居中; 首次出现(含应用启动)居中。**形态尺寸记忆**(2026-07-12 Zero 定): 手动调整过的窗口尺寸按形态持久化进 settings.json(`compactSize`/`largeSize`, 逻辑像素)——采集点 = 切换形态 / 关窗拦截(隐藏或退出) / 退出请求(⌘Q/托盘退出经 RunEvent::ExitRequested), 应用点 = set_window_form(记忆值钳到形态最小尺寸, None 用出厂默认)与启动 setup(show 前应用小窗记忆尺寸并保持居中, 无跳变); 两字段由 Rust 壳层**独占写入**, `set_settings` 忽略前端回传值(前端副本可能陈旧, 防覆盖新快照), 因此设置对话框"恢复默认"不清尺寸记忆; 现成的 tauri-plugin-window-state 按窗口 label 记忆, 不适配单窗口双形态模型, 故自实现。窗口配置 `visible:false` + 前端首帧后 `show()`(防启动白闪), `backgroundColor` = 画布色 #1e1f22(防 resize 白边), `theme: Dark`(Windows 标题栏恒暗), `acceptFirstMouse: true`(macOS 未聚焦首击即生效)。**关闭窗口不退出**(2026-07-11 Zero 定): 关闭请求被拦截为隐藏, 应用驻留系统托盘——托盘菜单"显示窗口/退出", Windows/Linux 左键单击唤回, macOS 点 Dock 图标重开; 隐藏不销毁 webview, 会话状态原样保留, 真正退出走托盘菜单(或 ⌘Q)。
 
 ### 5.1 Conflicts 文件列表 (参考图 1)
 

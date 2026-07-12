@@ -106,10 +106,12 @@ pub fn run() {
             commands::commits,
         ])
         .setup(|app| {
-            // 设置先于一切 UI 逻辑加载(关窗行为等在事件回调里同步读取)
+            // 设置先于一切 UI 逻辑加载(关窗行为等在事件回调里同步读取);
+            // 过一遍归一化, 手改配置文件的越界值(字号/窗口尺寸)在源头钳掉
             let loaded = commands::settings_file(app.handle())
                 .map(|f| settings::Settings::load(&f))
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .normalized();
             app.state::<commands::AppState>()
                 .init_settings(loaded.clone());
             build_tray(app)?;
@@ -117,6 +119,14 @@ pub fn run() {
             build_app_menu(app)?;
             // 窗口原生主题/底色按持久化设置就位(窗口尚未 show, 无闪变)
             commands::apply_to_shell(app.handle(), &loaded);
+            // 记忆的小窗尺寸同样在 show 前就位(启动路由必是小窗形态), 保持启动居中
+            if let (Some(ws), Some(win)) = (loaded.compact_size, app.get_webview_window("main")) {
+                let _ = win.set_size(tauri::LogicalSize::new(
+                    f64::from(ws.width),
+                    f64::from(ws.height),
+                ));
+                let _ = win.center();
+            }
             Ok(())
         })
         .on_menu_event(|app, e| {
@@ -128,8 +138,10 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
-            // 关窗行为由设置决定: 收进托盘(默认, 会话状态原样保留)或直接退出
+            // 关窗行为由设置决定: 收进托盘(默认, 会话状态原样保留)或直接退出;
+            // 无论走哪条路, 先把当前形态的窗口尺寸快照落盘(尺寸记忆的兜底采集点)
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                commands::remember_win_size(window.app_handle());
                 let state = window.app_handle().state::<commands::AppState>();
                 if state.close_to_tray() {
                     api.prevent_close();
@@ -146,11 +158,14 @@ pub fn run() {
             std::process::exit(1);
         }
     };
-    app.run(|_app, _event| {
-        // macOS: 窗口隐藏后点 Dock 图标重开
-        #[cfg(target_os = "macos")]
-        if let tauri::RunEvent::Reopen { .. } = _event {
-            show_main_window(_app);
+    app.run(|app, event| {
+        match event {
+            // 退出请求(⌘Q/应用菜单/托盘退出都经此): 退出前快照当前形态窗口尺寸
+            tauri::RunEvent::ExitRequested { .. } => commands::remember_win_size(app),
+            // macOS: 窗口隐藏后点 Dock 图标重开
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => show_main_window(app),
+            _ => {}
         }
     });
 }

@@ -11,6 +11,46 @@ use serde::{Deserialize, Serialize};
 /// 编辑器字号钳制范围(px)
 const FONT_SIZE_RANGE: std::ops::RangeInclusive<u32> = 8..=32;
 
+/// 窗口逻辑尺寸(DPI 无关; 形态尺寸记忆用)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WinSize {
+    /// 逻辑宽(px)
+    pub width: u32,
+    /// 逻辑高(px)
+    pub height: u32,
+}
+
+impl WinSize {
+    /// 双维下限钳制(记忆值不得小于形态最小尺寸)
+    pub fn clamp_min(self, min: WinSize) -> WinSize {
+        WinSize {
+            width: self.width.max(min.width),
+            height: self.height.max(min.height),
+        }
+    }
+}
+
+/// 小窗(打开页/菜单)最小尺寸
+pub const COMPACT_MIN: WinSize = WinSize {
+    width: 380,
+    height: 520,
+};
+/// 小窗出厂尺寸
+pub const COMPACT_DEFAULT: WinSize = WinSize {
+    width: 420,
+    height: 640,
+};
+/// 大窗(冲突列表/三栏)最小尺寸
+pub const LARGE_MIN: WinSize = WinSize {
+    width: 960,
+    height: 640,
+};
+/// 大窗出厂尺寸
+pub const LARGE_DEFAULT: WinSize = WinSize {
+    width: 1280,
+    height: 800,
+};
+
 /// 关闭窗口时的行为
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -78,6 +118,12 @@ pub struct Settings {
     pub theme: AppTheme,
     /// 界面语言
     pub language: Language,
+    /// 小窗上次尺寸(None = 没手动调过, 用出厂默认)。
+    /// 两个尺寸字段由 Rust 壳层独占写入(离开形态/隐藏/退出时快照),
+    /// `set_settings` 会忽略前端带来的值——前端副本可能是陈旧的
+    pub compact_size: Option<WinSize>,
+    /// 大窗上次尺寸(None = 没手动调过, 用出厂默认)
+    pub large_size: Option<WinSize>,
 }
 
 impl Default for Settings {
@@ -89,6 +135,8 @@ impl Default for Settings {
             highlight_words: true,
             theme: AppTheme::Dark,
             language: Language::Zh,
+            compact_size: None,
+            large_size: None,
         }
     }
 }
@@ -125,6 +173,8 @@ impl Settings {
             .collect::<String>()
             .trim()
             .to_string();
+        self.compact_size = self.compact_size.map(|s| s.clamp_min(COMPACT_MIN));
+        self.large_size = self.large_size.map(|s| s.clamp_min(LARGE_MIN));
         self
     }
 }
@@ -150,6 +200,8 @@ mod tests {
         assert!(s.highlight_words);
         assert_eq!(s.theme, AppTheme::Dark);
         assert_eq!(s.language, Language::Zh);
+        assert_eq!(s.compact_size, None);
+        assert_eq!(s.large_size, None);
     }
 
     #[test]
@@ -173,6 +225,11 @@ mod tests {
             highlight_words: false,
             theme: AppTheme::Light,
             language: Language::En,
+            compact_size: Some(WinSize {
+                width: 500,
+                height: 700,
+            }),
+            large_size: None,
         };
         s.save(&file).unwrap();
         assert_eq!(Settings::load(&file), s);
@@ -180,6 +237,7 @@ mod tests {
         let raw = std::fs::read_to_string(&file).unwrap();
         assert!(raw.contains("editorFontSize"));
         assert!(raw.contains("closeBehavior"));
+        assert!(raw.contains("compactSize"));
         assert!(raw.contains("\"light\""));
         assert!(raw.contains("\"en\""));
         std::fs::remove_dir_all(&dir).ok();
@@ -202,5 +260,36 @@ mod tests {
             ..Settings::default()
         };
         assert_eq!(dirty.normalized().editor_font_family, "Fira Code");
+    }
+
+    #[test]
+    fn normalized_clamps_window_sizes_to_form_minimums() {
+        let s = Settings {
+            compact_size: Some(WinSize {
+                width: 100,
+                height: 9000,
+            }),
+            large_size: Some(WinSize {
+                width: 1000,
+                height: 100,
+            }),
+            ..Settings::default()
+        }
+        .normalized();
+        // 单维不足只抬该维; 高于最小值的维度原样保留
+        assert_eq!(
+            s.compact_size,
+            Some(WinSize {
+                width: 380,
+                height: 9000,
+            })
+        );
+        assert_eq!(
+            s.large_size,
+            Some(WinSize {
+                width: 1000,
+                height: 640,
+            })
+        );
     }
 }

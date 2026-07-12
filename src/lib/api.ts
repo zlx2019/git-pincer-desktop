@@ -26,6 +26,14 @@ export type AppTheme = 'dark' | 'light';
 /** 界面语言: zh = 分层设计(大窗英文/小窗中文), en = 全英文 */
 export type Language = 'zh' | 'en';
 
+/** 窗口逻辑尺寸(形态尺寸记忆) */
+export interface WinSize {
+  /** 逻辑宽(px) */
+  width: number;
+  /** 逻辑高(px) */
+  height: number;
+}
+
 /** 用户设置(与 Rust settings.rs 严格镜像; 存 app-data/settings.json, 跨版本保留) */
 export interface Settings {
   /** 编辑器字号(px), Rust 侧钳制 8–32 */
@@ -40,6 +48,10 @@ export interface Settings {
   theme: AppTheme;
   /** 界面语言 */
   language: Language;
+  /** 小窗上次尺寸(Rust 壳层独占写入, set_settings 忽略前端值; null = 用出厂默认) */
+  compactSize: WinSize | null;
+  /** 大窗上次尺寸(同上) */
+  largeSize: WinSize | null;
 }
 
 /** 发起操作的结果 */

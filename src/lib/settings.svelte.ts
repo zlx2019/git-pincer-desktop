@@ -3,7 +3,8 @@
 // 三栏编辑器在进入 /merge 时新建, 天然拿到当次变量值, 无需热更新已存在的编辑器
 import { api, type Settings } from './api';
 
-/** 出厂默认(与 Rust `Settings::default()` 一致; "恢复默认"按钮用) */
+/** 出厂默认(与 Rust `Settings::default()` 一致; "恢复默认"按钮用——
+    窗口尺寸字段归 Rust 独占, set_settings 会忽略这里的 null, 恢复默认不清尺寸记忆) */
 export const DEFAULT_SETTINGS: Settings = {
   editorFontSize: 12,
   editorFontFamily: '',
@@ -11,6 +12,8 @@ export const DEFAULT_SETTINGS: Settings = {
   highlightWords: true,
   theme: 'dark',
   language: 'zh',
+  compactSize: null,
+  largeSize: null,
 };
 
 /** 内嵌等宽字体(随应用分发, 见 theme.css @font-face; 首项为默认, 存储值 '' 表示它) */

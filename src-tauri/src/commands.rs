@@ -10,7 +10,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::error::ShellError;
 use crate::merge::MergeSnapshot;
 use crate::repo::{Branch, CommitInfo, FileRow, LaunchKind, Op, PickSide, Repo, ThreeWay};
-use crate::settings::{AppTheme, CloseBehavior, Language, Settings};
+use crate::settings::{
+    AppTheme, COMPACT_DEFAULT, COMPACT_MIN, CloseBehavior, LARGE_DEFAULT, LARGE_MIN, Language,
+    Settings, WinSize,
+};
 
 /// 最近仓库列表的最大长度
 const RECENT_LIMIT: usize = 10;
@@ -180,9 +183,11 @@ pub struct OutputLine {
 
 /// 应用窗口形态: 最小尺寸/尺寸/定位一次完成(单次 IPC, 无多段跳变);
 /// 形态未变时为空操作——不把用户手动移动或调整过的窗口拽回屏幕中心。
-/// 定位规则: 切换时记住旧形态当前位置, 该形态本次运行内出现过就原位恢复
-/// (位置需仍落在某块屏幕上, 防拔外接屏后恢复到屏外), 首次出现才居中——
-/// 即启动居中, 冲突处理完/失败回小窗时回到进大窗前的位置
+/// 尺寸规则: 用户手动调整过的尺寸按形态记进设置落盘(切换时快照旧形态),
+/// 应用时记忆值优先(钳到形态最小尺寸), 没调过用出厂默认——跨启动贴合使用习惯。
+/// 定位规则: 切换时记住旧形态当前位置(仅内存), 该形态本次运行内出现过就原位恢复
+/// (位置需仍落在某块屏幕上, 防拔外接屏后恢复到屏外), 首次出现(含启动)居中——
+/// 冲突处理完/失败回小窗时回到进大窗前的位置
 #[tauri::command]
 pub async fn set_window_form(
     app: AppHandle,
@@ -199,23 +204,83 @@ pub async fn set_window_form(
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());
     };
-    if let (Some(prev), Ok(pos)) = (prev, win.outer_position()) {
-        state.win_pos.lock().unwrap_or_else(|e| e.into_inner())[prev.idx()] = Some(pos);
+    if let Some(prev) = prev {
+        if let Ok(pos) = win.outer_position() {
+            state.win_pos.lock().unwrap_or_else(|e| e.into_inner())[prev.idx()] = Some(pos);
+        }
+        remember_form_size(&app, &state, &win, prev);
     }
-    let ((min_w, min_h), (w, h)) = match form {
-        WinForm::Compact => ((380.0, 520.0), (420.0, 640.0)),
-        WinForm::Large => ((960.0, 640.0), (1280.0, 800.0)),
+    let (min, size) = {
+        let s = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+        match form {
+            WinForm::Compact => (
+                COMPACT_MIN,
+                s.compact_size
+                    .map_or(COMPACT_DEFAULT, |z| z.clamp_min(COMPACT_MIN)),
+            ),
+            WinForm::Large => (
+                LARGE_MIN,
+                s.large_size
+                    .map_or(LARGE_DEFAULT, |z| z.clamp_min(LARGE_MIN)),
+            ),
+        }
     };
-    win.set_min_size(Some(tauri::LogicalSize::new(min_w, min_h)))
-        .map_err(join_err)?;
-    win.set_size(tauri::LogicalSize::new(w, h))
-        .map_err(join_err)?;
+    win.set_min_size(Some(tauri::LogicalSize::new(
+        f64::from(min.width),
+        f64::from(min.height),
+    )))
+    .map_err(join_err)?;
+    win.set_size(tauri::LogicalSize::new(
+        f64::from(size.width),
+        f64::from(size.height),
+    ))
+    .map_err(join_err)?;
     let saved = state.win_pos.lock().unwrap_or_else(|e| e.into_inner())[form.idx()];
     match saved.filter(|p| on_screen(&win, *p)) {
         Some(p) => win.set_position(p).map_err(join_err)?,
         None => win.center().map_err(join_err)?,
     }
     Ok(())
+}
+
+/// 把窗口当前逻辑尺寸快照进指定形态的设置字段并尽力落盘(查询/写盘失败静默跳过,
+/// 不阻塞形态切换); 用户对窗口的手动调整由此跨启动保留
+fn remember_form_size(
+    app: &AppHandle,
+    state: &AppState,
+    win: &tauri::WebviewWindow,
+    form: WinForm,
+) {
+    let (Ok(size), Ok(scale)) = (win.inner_size(), win.scale_factor()) else {
+        return;
+    };
+    let logical = size.to_logical::<f64>(scale);
+    let ws = WinSize {
+        width: logical.width.round() as u32,
+        height: logical.height.round() as u32,
+    };
+    let snapshot = {
+        let mut s = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+        match form {
+            WinForm::Compact => s.compact_size = Some(ws),
+            WinForm::Large => s.large_size = Some(ws),
+        }
+        s.clone()
+    };
+    if let Some(f) = settings_file(app) {
+        let _ = snapshot.save(&f);
+    }
+}
+
+/// 隐藏/退出前快照当前形态的窗口尺寸(lib.rs 的关窗拦截与退出请求路径调用);
+/// 形态未知(窗口还没挂过形态)或窗口缺失时为空操作
+pub fn remember_win_size(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let form = *state.win_form.lock().unwrap_or_else(|e| e.into_inner());
+    let (Some(form), Some(win)) = (form, app.get_webview_window("main")) else {
+        return;
+    };
+    remember_form_size(app, &state, &win, form);
 }
 
 /// 窗口左上角(标题栏抓手)是否仍落在某块屏幕内; 查询失败按不可见处理(回退居中)
@@ -249,8 +314,15 @@ pub async fn set_settings(
     state: State<'_, AppState>,
     settings: Settings,
 ) -> Result<Settings, ShellError> {
-    let s = settings.normalized();
-    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = s.clone();
+    let mut s = settings.normalized();
+    {
+        // 窗口尺寸记忆归 Rust 独占: 前端副本可能陈旧(加载后壳层又快照过),
+        // 一律以内存现值为准, 设置对话框的任何改动都不碰这两个字段
+        let mut cur = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+        s.compact_size = cur.compact_size;
+        s.large_size = cur.large_size;
+        *cur = s.clone();
+    }
     apply_to_shell(&app, &s);
     let file = settings_file(&app)
         .ok_or_else(|| ShellError::Internal("cannot resolve app data dir".into()))?;
