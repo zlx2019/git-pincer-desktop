@@ -7,20 +7,21 @@
   import { api } from '$lib/api';
   import { loadSettings, settingsUi } from '$lib/settings.svelte';
   import { toasts } from '$lib/toast.svelte';
-  import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 
   let { children } = $props();
 
   onMount(() => {
-    // 用户设置(字号/字体等 CSS 变量)先行加载, 与首帧显示并行
-    loadSettings();
-    // 窗口配置 visible:false: 首帧绘制完成后再显示, 启动不再闪白底/无样式内容
-    requestAnimationFrame(() => {
-      const win = getCurrentWindow();
-      win
-        .show()
-        .then(() => win.setFocus())
-        .catch(() => {});
+    // 窗口配置 visible:false: 等设置就位(data-theme 已落 DOM, 浅色用户不再暗→亮闪变)
+    // 且首帧绘制完成后再显示; loadSettings 挂掉/超时则 150ms 兜底显窗, 不能让窗口不出来
+    const fallback = new Promise((r) => setTimeout(r, 150));
+    Promise.race([loadSettings(), fallback]).then(() => {
+      requestAnimationFrame(() => {
+        const win = getCurrentWindow();
+        win
+          .show()
+          .then(() => win.setFocus())
+          .catch(() => {});
+      });
     });
     // macOS 应用菜单 "设置…" → 弹全局设置对话框
     let unlisten: (() => void) | undefined;
@@ -64,7 +65,10 @@
 {@render children()}
 
 {#if settingsUi.open}
-  <SettingsDialog onclose={() => (settingsUi.open = false)} />
+  <!-- 动态 import: 对话框携带 plugin-opener/getVersion, 静态引入会被拖进 boot chunk -->
+  {#await import('$lib/components/SettingsDialog.svelte') then { default: SettingsDialog }}
+    <SettingsDialog onclose={() => (settingsUi.open = false)} />
+  {/await}
 {/if}
 
 {#if toasts.list.length}

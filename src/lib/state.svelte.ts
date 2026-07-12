@@ -16,16 +16,24 @@ export interface TermEntry {
   text: string;
 }
 
+/** 入缓冲后的终端条目: 附单调 id 作 {#each} 的稳定 key——
+    封顶裁剪的 splice 会移位索引, 按索引 key 会让整个可见列表重渲 */
+export interface TermRow extends TermEntry {
+  id: number;
+}
+
 /** 菜单页终端缓冲(会话级): 列表页的操作结局(continue 完成 / abort)也汇入这里 */
-export const term = $state({ entries: [] as TermEntry[] });
+export const term = $state({ entries: [] as TermRow[] });
 
 /** 终端缓冲上限: 超限丢最旧的一批(留余量, 摊薄触发频率), DOM 不随长会话无界增长 */
 const TERM_LIMIT = 2000;
 const TERM_KEEP = 1800;
 
+let termSeq = 0;
+
 /** 追加终端条目并执行上限裁剪(高频来源请配合 rAF 合帧批量调用) */
 export function pushTerm(...batch: TermEntry[]) {
-  term.entries.push(...batch);
+  term.entries.push(...batch.map((e) => ({ ...e, id: termSeq++ })));
   if (term.entries.length > TERM_LIMIT) {
     term.entries.splice(0, term.entries.length - TERM_KEEP);
   }

@@ -236,8 +236,10 @@ fn continue_finishes_merge_after_resolution() {
 
     let mut lines = Vec::new();
     let status = repo
-        .continue_op(Op::Merge, |stream, line| {
-            lines.push(format!("{stream}: {line}"))
+        .continue_op(Op::Merge, |batch| {
+            for (stream, line) in batch {
+                lines.push(format!("{stream}: {line}"));
+            }
         })
         .unwrap();
     assert!(status.success(), "continue failed: {lines:?}");
@@ -253,8 +255,8 @@ fn launch_merge_reports_conflicts() {
 
     let mut lines = Vec::new();
     let status = repo
-        .launch(LaunchKind::Merge, &["feature".into()], |_, line| {
-            lines.push(line)
+        .launch(LaunchKind::Merge, &["feature".into()], |batch| {
+            lines.extend(batch.into_iter().map(|(_, line)| line))
         })
         .unwrap();
     assert!(!status.success());

@@ -103,8 +103,9 @@ struct Cluster {
     b: Vec<Seg>,
 }
 
-/// 构建三栏快照(入口, 纯函数)
-pub fn build_snapshot(path: &str, base: &str, ours: &str, theirs: &str) -> MergeSnapshot {
+/// 构建三栏快照(入口, 纯函数); 三份全文按值传入并直接移入快照——
+/// 临近 2MB 上限的大文件不再多复制一轮全文
+pub fn build_snapshot(path: &str, base: String, ours: String, theirs: String) -> MergeSnapshot {
     let b: Vec<&str> = base.split('\n').collect();
     let o: Vec<&str> = ours.split('\n').collect();
     let t: Vec<&str> = theirs.split('\n').collect();
@@ -127,9 +128,9 @@ pub fn build_snapshot(path: &str, base: &str, ours: &str, theirs: &str) -> Merge
         .count();
     MergeSnapshot {
         path: path.to_owned(),
-        left: ours.to_owned(),
-        result: base.to_owned(),
-        right: theirs.to_owned(),
+        left: ours,
+        result: base,
+        right: theirs,
         chunks,
         changes,
         conflicts,
@@ -394,7 +395,7 @@ mod tests {
     use super::*;
 
     fn snap(base: &str, ours: &str, theirs: &str) -> MergeSnapshot {
-        build_snapshot("t.txt", base, ours, theirs)
+        build_snapshot("t.txt", base.into(), ours.into(), theirs.into())
     }
 
     #[test]

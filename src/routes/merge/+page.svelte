@@ -609,7 +609,9 @@
   {#if snap}
     <div class="labels">
       <span class="pane-label">Changes from <b>{session.info?.yoursLabel}</b></span>
-      <span class="pane-label center">Result</span>
+      <span class="label-seam"></span>
+      <span class="pane-label">Result</span>
+      <span class="label-seam"></span>
       <span class="pane-label">Changes from <b>{session.info?.theirsLabel}</b></span>
     </div>
 
@@ -827,18 +829,25 @@
     flex: 1;
   }
 
+  /* 标题行与下方 .panes 同构(1fr + 44px 接缝 + … + 右侧 12px 标尺留白):
+     标题正好在各自栏上方居中, 分隔线正压栏边界, 不再随三等分网格漂移 */
   .labels {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    display: flex;
+    padding-right: 12px;
     border-bottom: 1px solid var(--d-border);
     background: var(--d-panel);
   }
 
   .pane-label {
+    flex: 1;
+    min-width: 0;
     padding: 5px 12px;
     font-size: 11px;
     color: var(--d-dim);
-    border-right: 1px solid var(--d-border);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .pane-label b {
@@ -846,8 +855,11 @@
     font-weight: 600;
   }
 
-  .pane-label.center {
-    text-align: center;
+  .label-seam {
+    width: 44px;
+    flex: none;
+    border-left: 1px solid var(--d-border);
+    border-right: 1px solid var(--d-border);
   }
 
   .panes {

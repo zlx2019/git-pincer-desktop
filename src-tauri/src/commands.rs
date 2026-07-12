@@ -173,13 +173,22 @@ pub enum RoundOutcome {
     },
 }
 
-/// `git://output` 事件载荷: continue 过程的一行输出
+/// `git://output` 事件载荷元素: launch/continue 过程的一行输出(事件按批推送)
 #[derive(Debug, Clone, Serialize)]
 pub struct OutputLine {
     /// 来源流: stdout / stderr
     pub stream: &'static str,
     /// 行内容
     pub line: String,
+}
+
+/// 把 repo 层聚好的一批输出行序列化为单个 `git://output` 事件(失败静默, 输出是尽力而为)
+fn emit_output(app: &AppHandle, lines: Vec<(&'static str, String)>) {
+    let batch: Vec<OutputLine> = lines
+        .into_iter()
+        .map(|(stream, line)| OutputLine { stream, line })
+        .collect();
+    let _ = app.emit("git://output", batch);
 }
 
 /// 应用窗口形态: 最小尺寸/尺寸/定位一次完成(单次 IPC, 无多段跳变);
@@ -244,44 +253,58 @@ pub async fn set_window_form(
     Ok(())
 }
 
-/// 把窗口当前逻辑尺寸快照进指定形态的设置字段并尽力落盘(查询/写盘失败静默跳过,
-/// 不阻塞形态切换); 用户对窗口的手动调整由此跨启动保留
-fn remember_form_size(
-    app: &AppHandle,
+/// 把窗口当前逻辑尺寸快照进指定形态的设置字段(纯内存), 返回更新后的设置副本供落盘;
+/// 尺寸查询失败返回 None(调用方静默跳过)。用户对窗口的手动调整由此跨启动保留
+fn capture_form_size(
     state: &AppState,
     win: &tauri::WebviewWindow,
     form: WinForm,
-) {
+) -> Option<Settings> {
     let (Ok(size), Ok(scale)) = (win.inner_size(), win.scale_factor()) else {
-        return;
+        return None;
     };
     let logical = size.to_logical::<f64>(scale);
     let ws = WinSize {
         width: logical.width.round() as u32,
         height: logical.height.round() as u32,
     };
-    let snapshot = {
-        let mut s = state.settings.lock().unwrap_or_else(|e| e.into_inner());
-        match form {
-            WinForm::Compact => s.compact_size = Some(ws),
-            WinForm::Large => s.large_size = Some(ws),
-        }
-        s.clone()
-    };
-    if let Some(f) = settings_file(app) {
-        let _ = snapshot.save(&f);
+    let mut s = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+    match form {
+        WinForm::Compact => s.compact_size = Some(ws),
+        WinForm::Large => s.large_size = Some(ws),
+    }
+    Some(s.clone())
+}
+
+/// 采尺寸并尽力落盘(形态切换路径; 查询/写盘失败静默跳过, 不阻塞形态切换)
+fn remember_form_size(
+    app: &AppHandle,
+    state: &AppState,
+    win: &tauri::WebviewWindow,
+    form: WinForm,
+) {
+    if let Some(snapshot) = capture_form_size(state, win, form) {
+        persist_settings(app, &snapshot);
     }
 }
 
-/// 隐藏/退出前快照当前形态的窗口尺寸(lib.rs 的关窗拦截与退出请求路径调用);
-/// 形态未知(窗口还没挂过形态)或窗口缺失时为空操作
-pub fn remember_win_size(app: &AppHandle) {
+/// 隐藏/退出前快照当前形态的窗口尺寸(纯内存), 返回待落盘的设置副本——
+/// lib.rs 先隐藏窗口再用返回值落盘, 磁盘延迟不垫在"点关闭→窗口消失"的手感里;
+/// 形态未知(窗口还没挂过形态)或窗口缺失时返回 None
+pub fn remember_win_size(app: &AppHandle) -> Option<Settings> {
     let state = app.state::<AppState>();
     let form = *state.win_form.lock().unwrap_or_else(|e| e.into_inner());
     let (Some(form), Some(win)) = (form, app.get_webview_window("main")) else {
-        return;
+        return None;
     };
-    remember_form_size(app, &state, &win, form);
+    capture_form_size(&state, &win, form)
+}
+
+/// 设置快照落盘(尽力而为, 失败静默)
+pub fn persist_settings(app: &AppHandle, snapshot: &Settings) {
+    if let Some(f) = settings_file(app) {
+        let _ = snapshot.save(&f);
+    }
 }
 
 /// 窗口左上角(标题栏抓手)是否仍落在某块屏幕内; 查询失败按不可见处理(回退居中)
@@ -404,7 +427,7 @@ pub async fn open_merge(
     let repo = current(&state)?;
     tauri::async_runtime::spawn_blocking(move || {
         let three = repo.read_three(&path);
-        crate::merge::build_snapshot(&path, &three.base, &three.ours, &three.theirs)
+        crate::merge::build_snapshot(&path, three.base, three.ours, three.theirs)
     })
     .await
     .map_err(join_err)
@@ -423,7 +446,7 @@ pub async fn save_result(
         .map_err(join_err)?
 }
 
-/// 驱动 `git <op> --continue`; 输出逐行以 `git://output` 事件推送
+/// 驱动 `git <op> --continue`; 输出按批(repo 层聚批)以 `git://output` 事件推送
 #[tauri::command]
 pub async fn continue_op(
     app: AppHandle,
@@ -434,9 +457,7 @@ pub async fn continue_op(
         let Some(op) = repo.op() else {
             return Ok(RoundOutcome::Done);
         };
-        let status = repo.continue_op(op, |stream, line| {
-            let _ = app.emit("git://output", OutputLine { stream, line });
-        })?;
+        let status = repo.continue_op(op, |lines| emit_output(&app, lines))?;
         if status.success() {
             return Ok(RoundOutcome::Done);
         }
@@ -454,7 +475,7 @@ pub async fn continue_op(
     .map_err(join_err)?
 }
 
-/// 从菜单发起操作; 输出以 `git://output` 事件推送, 结束后按仓库状态分流
+/// 从菜单发起操作; 输出按批以 `git://output` 事件推送, 结束后按仓库状态分流
 #[tauri::command]
 pub async fn launch_op(
     app: AppHandle,
@@ -464,9 +485,7 @@ pub async fn launch_op(
 ) -> Result<LaunchOutcome, ShellError> {
     let repo = current(&state)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let status = repo.launch(kind, &targets, |stream, line| {
-            let _ = app.emit("git://output", OutputLine { stream, line });
-        })?;
+        let status = repo.launch(kind, &targets, |lines| emit_output(&app, lines))?;
         // 只要出现冲突就接管, 与退出码无关; 干净且零退出才算顺利完成
         let files = repo.conflicts()?;
         if !files.is_empty() {

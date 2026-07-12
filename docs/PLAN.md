@@ -53,7 +53,7 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `read_three(path) → {base, ours, theirs}` | `git show :1:p` `:2:p` `:3:p`; 缺失 stage 返回空串 |
 | `accept_side(paths[], side)` | `git checkout --ours/--theirs --` + `git add`; 取"删除侧"时 `git rm --cached` + 删工作区文件 |
 | `save_result(path, text)` | 写工作区文件 + `git add` (三栏 Apply / binary 选择共用) |
-| `continue_op()` | `git <op> --continue` 管道捕获, stdout/err 逐行发事件; 退出非零且仍有冲突 = 新一轮 (rebase), 否则报错 |
+| `continue_op()` | `git <op> --continue` 管道捕获, stdout/err 聚批发事件; 退出非零且仍有冲突 = 新一轮 (rebase), 否则报错 |
 | `abort_op()` | `git <op> --abort` (rebase 用 `--abort`, merge 用 `merge --abort`) |
 | `recent_repos() → path[]` | 最近打开列表 (tauri app-data 存 JSON); 目录选择器由前端直接走 tauri-plugin-dialog, 不设专门命令 |
 | `recent_remove(path) → path[]` | 从最近列表移除一项, 返回过滤后列表 |
@@ -65,7 +65,8 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `get_settings() → Settings` | 用户设置(启动时 setup 从 app-data/settings.json 载入内存) |
 | `set_settings(settings) → Settings` | 归一化(字号钳 8–32, 字体名清洗) → 内存 → 落盘; 返回归一化结果供前端回同步 |
 
-事件只有一个: `git://output {stream, line}` (launch/continue 的输出流, 发起前订阅、结束即退订)。
+事件只有一个: `git://output [{stream, line}, …]` (launch/continue 的输出流, 发起前订阅、结束即退订;
+载荷是一批行——Rust 侧 repo.rs 按 ≤25ms/≤64 行聚批发送, IPC 频次从每行一次降到每窗口一次, 2026-07-12 定)。
 结局不走事件——launch/continue 的结果由命令返回值带回 (`LaunchOutcome` / `RoundOutcome`, `tag="kind"` 的 tagged union); 旧方案的 `git://round` / `git://done` 未实现也不再计划。
 错误统一 `thiserror` 定义 + serde 序列化, 前端 toast 呈现。
 
@@ -190,9 +191,11 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 - **全局统一 IDEA New UI 暗色**(2026-07-10 Zero 拍板): 冲突大窗布局按参考图 1:1、配色换 IDEA Dark、文案英文; 菜单小窗带中文说明;
 - 撤销只在会话内有效, Apply 落盘后不可撤 (可重新 checkout 制造冲突, 不在本工具内做);
 - **构建 profile**(2026-07-12 定): dev 下依赖统一 O2(similar 热循环走优化码路, `pnpm tauri dev` 体验≈release; 首次构建慢一次, 本 crate 保持 O0 快增量), release 用完整 LTO + codegen-units=1 + opt-level=3 + strip + `panic = "abort"`(Zero 拍板, 换免展开表的更小更快二进制)。代价要清楚: release 下 spawn_blocking 里的意外 panic 会直接终止应用而不是落成前端 toast——dev 仍是展开, 崩溃排查用 dev 复现; clippy 的 `panic/unwrap_used` 告警把 panic 面压到最低是这个选择的前提;
-- **终端缓冲**: `git://output` 前端 rAF 合帧批量落地, 缓冲上限 2000 条(超限整批丢最旧), 长会话 DOM 不无界增长;
+- **终端缓冲**: `git://output` Rust 侧聚批 + 前端 rAF 合帧批量落地, 缓冲上限 2000 条(超限整批丢最旧;
+  条目挂单调 id 作渲染 key, 裁剪 splice 不再整列表重渲), 长会话 DOM 不无界增长;
 - **聚焦重探限频**: 800ms 冷却 + 进行中不叠加(菜单页与冲突列表页共同约定);
 - **生产加固**: 禁浏览器右键菜单(可编辑区/有选区除外, 选区保留原生 Copy)与刷新/打印快捷键(刷新丢会话状态); dev 构建不受限;
 - **设置系统**(2026-07-12 Zero 定, 推翻"配置系统不做"): 存 app-data `settings.json`(与 recent.json 同目录, 应用更新/重装保留); Rust `settings.rs` 类型化 `Settings`, **全字段 `#[serde(default)]`** = 跨版本兼容契约(旧文件缺字段落默认, 新版本删的字段被忽略, 永不因升级重置); 前端 `settings.svelte.ts` **即改即存**(无 OK/Cancel 暂存), 经 `--editor-font-size` / `--editor-font-family` CSS 变量生效(编辑器进 /merge 时新建取当次值, 不做热更新); 入口 = 菜单顶栏齿轮。首批四项: 编辑器字号(钳 8–32)/编辑器字体(空 = 内嵌 JetBrains Mono)/关窗行为(托盘|退出, lib.rs 关闭拦截读 `AppState::close_to_tray()`)/词级强调默认开关。**编辑器字体选择器**(2026-07-12): 自由文本框升级为下拉——内嵌清单 `EMBEDDED_FONTS`(JetBrains Mono 默认 + Maple Mono) + "自定义…"展开文本框输系统字体名, 存储契约不变(仍是单字符串, '' = 默认); 进 /merge 建编辑器前 `ensureEditorFont()` 用 `document.fonts.load` 预载所选字体(与快照/语言包并行), 防 CM6 首次测量按回落字体算宽。**主题与语言**(2026-07-12 同日落地): `theme = dark|light`——亮色即 §6 的 Light tokens 整体翻转, CM6 出亮暗双主题+双语法配色(进 /merge 时按当次设置选用), 窗口原生主题/底色与托盘菜单文案由 Rust `apply_to_shell` 在 setup 与 set_settings 时同步; `language = zh|en`——**zh 保持分层设计(大窗 IDEA 英文原文 + 小窗中文辅助), en 为全英文**, 大窗原文不进词典; 词典在 `src/lib/i18n.ts`(纯模块, [zh,en] 词条, vitest 校验完整性), 响应式 `t()` 读语言设置, 切换后已挂载 UI 即时翻转无需重载。设置入口 ×2 (2026-07-12 Zero 定, 撤掉菜单页齿轮保持顶栏极简): **macOS 应用菜单 "设置…"**(默认菜单插项, About 之后, 事件 `app://open-settings` 唤窗弹框, 文案随语言) / **⌘(Ctrl)+, 快捷键**(webview 侧监听, 全平台全页面); 对话框渲染在根布局, 任何路由可弹, 编辑器相关项注明"重进合并页生效"; **三页签布局**(2026-07-12 Zero 定): 通用(语言/关窗) · 界面(主题/编辑器字号/字体/词级强调) · 关于(字标/版本/主页/许可/致谢), 活动页签橙色下划线(用色约定允许项), 正文定高切页不跳动, 关于页脚只留"完成"。
 - **产品名 PINCER**(2026-07-12 Zero 定): `product-name` / 窗口 title / 托盘 tooltip 统一 "PINCER"——.app 名、菜单栏应用菜单标题、安装列表、发布产物文件名随之; `identifier` 不变(用户数据路径不动), 仓库/包名仍 git-pincer-desktop。
 - **Tauri 配置 TOML 化**(2026-07-12 Zero 定): `src-tauri/Tauri.toml` 替代 tauri.conf.json——tauri 与 tauri-build **同时启用 `config-toml` feature**(编译期 build.rs 与 `generate_context!` 都要解析), CLI 侧原生支持无需配置; 键名按官方惯例 **kebab-case**(camelCase 经 serde alias 同样可用); TOML 无 null 字面量, 原 `csp: null` 曾以省略键表达。**CSP 加固**(2026-07-12): default-src 'self' + Tauri IPC 通道(ipc:/http://ipc.localhost) + style unsafe-inline(CM6/Svelte 内联样式) + 字体图片随包——纯静态 SPA 无远程内容, 收紧无功能损失; bundle 补齐 macOS 最低版本 10.15 / NSIS+WiX 安装器中英双语 / deb section=vcs。
+- **性能 v2**(2026-07-12 本轮, 过程清单见 docs/PERF.md): 显窗时机 = **设置就位后的首帧**(浅色主题启动不再暗→亮闪变, loadSettings 竞速 150ms 兜底); SettingsDialog 动态 import 出 boot chunk(它拖着 plugin-opener/getVersion); `git://output` Rust 聚批 + 终端条目 id key(见上); 关窗收托盘时序 = **采尺寸(内存)→hide→落盘**(磁盘延迟不垫关窗手感, commands.rs capture/persist 拆分); `build_snapshot` 三份全文**按值移动**进快照(临近 2MB 的文件省一轮全文拷贝); 冲突列表 path→index Map 消 O(N²); /conflicts 预热 ensureEditorFont(preloadCode 上轮已有)。平台专属(Tauri.toml): Windows `scroll-bar-style = "fluentOverlay"`(WebView2 ≥125, 低版本无操作), macOS 14+ `background-throttling = "disabled"`(默认策略驻留托盘约 5 分钟后挂起页面, 长操作终端输出断流), 打包 `remove-unused-commands`(按 ACL 清未用插件命令)。**明确不做**: Linux 不无条件设 `WEBKIT_DISABLE_*` 环境变量(官方警示会给所有人关掉加速路径, WebKitGTK ≥2.42 已自带 NVIDIA 规避, 等真实报障再按机器条件化); `additional-browser-args` 不碰(一旦设置整体顶掉 wry 默认参数); panes 不加 CSS contain(WKWebView 接缝重绘 bug)。

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Output, Stdio};
 use std::sync::mpsc;
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +25,11 @@ const SCRUBBED_ENV: &[&str] = &[
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_COMMON_DIR",
 ];
+
+/// 流式输出聚批窗口: 首行到达后最多再攒这么久一并回调, 也是首行回显延迟的上限
+const STREAM_BATCH_WINDOW: Duration = Duration::from_millis(25);
+/// 流式输出单批行数上限: 刷屏式输出下限制单个事件载荷的体积
+const STREAM_BATCH_MAX: usize = 64;
 
 /// 进行中的合并类操作
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -322,12 +328,14 @@ impl Repo {
         Ok(())
     }
 
-    /// 流式执行 git: 输出逐行回调。注入 GIT_EDITOR=true(操作可能自动提交)、
-    /// GIT_TERMINAL_PROMPT=0(无终端可用, 让 git 立即失败而不是挂起等待输入)
+    /// 流式执行 git: 输出按批回调(首行到达后最多攒 `STREAM_BATCH_WINDOW` 或
+    /// `STREAM_BATCH_MAX` 行, 事件/IPC 频次从每行一次降到每窗口一次)。
+    /// 注入 GIT_EDITOR=true(操作可能自动提交)、GIT_TERMINAL_PROMPT=0(无终端可用,
+    /// 让 git 立即失败而不是挂起等待输入)
     pub fn run_streaming(
         &self,
         args: &[&str],
-        mut on_line: impl FnMut(&'static str, String),
+        mut on_lines: impl FnMut(Vec<(&'static str, String)>),
     ) -> Result<ExitStatus, ShellError> {
         let mut cmd = Command::new("git");
         cmd.current_dir(&self.root)
@@ -351,9 +359,22 @@ impl Repo {
             readers.push(spawn_line_reader("stderr", err, tx.clone()));
         }
         drop(tx);
-        // 两个 reader 线程结束后通道关闭, 循环随之退出
-        for (stream, line) in rx {
-            on_line(stream, line);
+        // 聚批转发: recv 空闲阻塞等首行(无输出不空转), 到达后在窗口内续攒,
+        // 满窗/满批/断流即刷出; 两个 reader 线程结束后通道关闭, 外层循环随之退出
+        while let Ok(first) = rx.recv() {
+            let mut batch = vec![first];
+            let deadline = Instant::now() + STREAM_BATCH_WINDOW;
+            while batch.len() < STREAM_BATCH_MAX {
+                let left = deadline.saturating_duration_since(Instant::now());
+                if left.is_zero() {
+                    break;
+                }
+                match rx.recv_timeout(left) {
+                    Ok(item) => batch.push(item),
+                    Err(_) => break,
+                }
+            }
+            on_lines(batch);
         }
         for reader in readers {
             let _ = reader.join();
@@ -365,9 +386,9 @@ impl Repo {
     pub fn continue_op(
         &self,
         op: Op,
-        on_line: impl FnMut(&'static str, String),
+        on_lines: impl FnMut(Vec<(&'static str, String)>),
     ) -> Result<ExitStatus, ShellError> {
-        self.run_streaming(&[op.name(), "--continue"], on_line)
+        self.run_streaming(&[op.name(), "--continue"], on_lines)
     }
 
     /// 从菜单发起操作(pull 无目标, merge/rebase 单目标, cherry-pick/revert 可多提交)
@@ -375,11 +396,11 @@ impl Repo {
         &self,
         kind: LaunchKind,
         targets: &[String],
-        on_line: impl FnMut(&'static str, String),
+        on_lines: impl FnMut(Vec<(&'static str, String)>),
     ) -> Result<ExitStatus, ShellError> {
         let mut args = vec![kind.name()];
         args.extend(targets.iter().map(String::as_str));
-        self.run_streaming(&args, on_line)
+        self.run_streaming(&args, on_lines)
     }
 
     /// 中止当前操作(`git <op> --abort`)

@@ -9,6 +9,7 @@
   import { fileIcon } from '$lib/fileicon';
   import { t } from '$lib/i18n.svelte';
   import { largeWindow } from '$lib/win';
+  import { ensureEditorFont } from '$lib/settings.svelte';
   import { pushTerm, session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import BinaryDialog from '$lib/components/BinaryDialog.svelte';
@@ -34,8 +35,10 @@
     session.parked = false;
     // 冲突处理使用大窗
     largeWindow().catch(() => {});
-    // 三栏页代码预热(CM6 是最大的路由块): 点 Merge... 时不再现场拉取/解析
+    // 三栏页预热: 路由代码(CM6 是最大的路由块) + 所选编辑器字体,
+    // 点 Merge... 时不再现场拉取/解析
     preloadCode('/merge').catch(() => {});
+    ensureEditorFont();
     // 冲突在终端/IDE 里产生: 窗口重获焦点时自动重探仓库状态
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -59,7 +62,7 @@
       const info = await api.repoOpen();
       session.info = info;
       const files = info.op ? await api.conflicts() : [];
-      if (JSON.stringify(files) !== JSON.stringify(session.files)) {
+      if (filesKey(files) !== filesKey(session.files)) {
         session.files = files;
         selected.clear();
         lastIndex = -1;
@@ -72,6 +75,11 @@
       probing = false;
       lastProbe = Date.now();
     }
+  }
+
+  /** 列表身份键(重探比较用): 逐字段拼接, 免去两次整列表 JSON 序列化 */
+  function filesKey(files: FileRow[]): string {
+    return files.map((f) => `${f.path}\0${f.yours}\0${f.theirs}\0${f.binary}`).join('\n');
   }
 
   // 目录分组视图; 未分组时退化为单组
@@ -88,8 +96,9 @@
       .map(([dir, files]) => ({ dir: dir as string | null, files }));
   });
 
-  // 可见顺序的平铺列表(shift 范围选择用)
+  // 可见顺序的平铺列表(shift 范围选择用)与 path→序号索引(行内 indexOf 是 O(N²))
   const flat = $derived(groups.flatMap((g) => g.files));
+  const flatIndex = $derived(new Map(flat.map((f, i) => [f.path, i])));
 
   // 恰好单选时的那一行
   const single = $derived(
@@ -169,7 +178,9 @@
     outputLines = [];
     const op = session.info?.op;
     const batch = rafBatcher<OutputLine>((b) => outputLines.push(...b));
-    const unlisten = await api.onOutput((l) => batch.push(l));
+    const unlisten = await api.onOutput((lines) => {
+      for (const l of lines) batch.push(l);
+    });
     try {
       const outcome = await api.continueOp();
       batch.drain();
@@ -296,7 +307,7 @@
                 {/if}
                 {#each g.files as f (f.path)}
                   {@const [fname, fdir] = splitPath(f.path)}
-                  {@const index = flat.indexOf(f)}
+                  {@const index = flatIndex.get(f.path) ?? -1}
                   {@const fi = fileIcon(f.path)}
                   <tr
                     class:selected={selected.has(f.path)}
