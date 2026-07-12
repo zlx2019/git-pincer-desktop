@@ -104,7 +104,8 @@ IDEA 的列表是按类型着色图标, 辨识度高很多。做法 (不违反"�
 - GitHub 仓库 Settings → Social preview 上传 1280×640 社图 (被分享到任何平台时的门面),
   内容可以就是横幅加一张三栏截图。
 
-### 2.4 英文 README
+### 2.4 英文 README — ✅ 完成 (2026-07-12)
+README.md 英文为主(国际默认) + README.zh.md 中文镜像, 顶部互链; FAQ 四问随两版落地。
 Tauri/Rust 社区受众大半英文。推荐 `README.md` 英文为主 (国际默认) + `README.zh.md` 中文,
 或反之但顶部互链。UI 本身的中英分层 (大窗英文/小窗中文) 也值得在 README 里说明一句。
 
@@ -121,14 +122,14 @@ Tauri/Rust 社区受众大半英文。推荐 `README.md` 英文为主 (国际默
 |---|---|
 | 自动更新 | `tauri-plugin-updater` + release.yml 产 `latest.json`; 桌面工具的留存关键。需要 updater 签名密钥对, 建议 P0 做完就排上 |
 | dmg 安装体验 | tauri dmg 配置支持背景图 + 图标摆位 (`bundle.macOS.dmg`), 一张 "拖到 Applications" 的深色背景图即可 |
-| About 面板 | macOS 默认菜单的 About 显示包名裸信息; 应用内加"关于"(版本/许可证/主页/致谢 similar·CM6·JetBrains Mono) 更体面 |
+| About 面板 | ✅ (2026-07-12) 设置对话框内置关于块: PINCER 字标 + 版本(getVersion) + 项目主页(opener) + 许可/隐私行 + 致谢行 |
 | 产品显示名 | `productName` 目前是 `git-pincer-desktop`, .app/菜单栏就叫这个; 若想显示 "PINCER" 需改 productName (影响产物文件名, 发布前定, 之后别动) |
-| issue 表单化 | `.github/ISSUE_TEMPLATE/*.md` 升级为 `.yml` 表单 (必填项/下拉选平台版本), 提质 bug 报告 |
+| issue 表单化 | ❌ 不做 (2026-07-12 Zero 定, 维持现有 .md 模板) |
 | FUNDING.yml | 想接受赞助就加 (GitHub Sponsors / 爱发电), 不想就跳过 |
 | 隐私一句话 | ✅ (2026-07-12) README 已写明 "不联网、无遥测、git 凭据走你本机配置" |
 | 性能/体积卖点 | README 放硬数字: .app 5.1MB、启动 <1s、纯 Rust diff 引擎——对比 Electron 类是差异化卖点 |
-| FAQ | "为什么只做冲突流程不做 git 客户端" (定位)、"和 IDEA 内置合并的关系"、Gatekeeper 放行、Linux 依赖 (webkit2gtk) |
-| 演示仓库 | README 里 playground 依赖姊妹仓库源码; 提供一个 `scripts/demo-repo.sh` 直接造演示冲突, 降低尝鲜门槛 |
+| FAQ | ✅ (2026-07-12) 四问已进两版 README: 定位、与 IDEA 关系、Gatekeeper 放行、Linux webkit2gtk |
+| 演示仓库 | ✅ (2026-07-12) `scripts/demo-repo.sh`: 文本冲突 ×2 + 二进制冲突 ×1, README "30 秒上手"节引用 |
 | win/linux 实测记录 | release 矩阵会出包但没人验证过; 找台 Windows/Linux 跑一遍冒烟, README 标注"已验证平台" |
 | 代码统计徽章/覆盖率 | 可选; 单人项目性价比低, 放最后 |
 

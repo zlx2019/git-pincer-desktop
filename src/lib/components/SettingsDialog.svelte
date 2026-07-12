@@ -1,10 +1,18 @@
 <script lang="ts">
   // 设置对话框(菜单小窗入口, 文案随语言设置): 即改即存——每项落定立即生效并持久化,
   // 无 OK/Cancel 暂存语义; "完成"只是关闭
+  import { getVersion } from '@tauri-apps/api/app';
+  import { openUrl } from '@tauri-apps/plugin-opener';
   import { t } from '$lib/i18n.svelte';
   import { DEFAULT_SETTINGS, EMBEDDED_FONTS, settings, updateSettings } from '$lib/settings.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
+
+  // 关于块的版本号(壳层查询; mock/测试环境拿不到就不显示)
+  let version = $state('');
+  getVersion()
+    .then((v) => (version = v ?? ''))
+    .catch(() => {});
 
   /** 字号落定(blur/Enter): 数字化, 越界交给 Rust 钳制后回同步 */
   function commitSize(e: Event) {
@@ -143,6 +151,20 @@
       </label>
     </div>
     <p class="note dim">{t('set-editor-note')}</p>
+    <div class="about">
+      <span class="brand">PINCER</span>
+      {#if version}<span class="dim">v{version}</span>{/if}
+      <span class="dim">·</span>
+      <button
+        class="link"
+        onclick={() => openUrl('https://github.com/zlx2019/git-pincer-desktop').catch(() => {})}
+        >{t('set-github')}</button
+      >
+      <p class="credits dim">{t('set-about-lic')}</p>
+      <p class="credits dim">
+        {t('set-about-thanks')}similar · CodeMirror 6 · JetBrains Mono · Maple Mono · file-icons
+      </p>
+    </div>
     <footer>
       <button
         onclick={() => {
@@ -321,6 +343,45 @@
   .note {
     margin: 8px 2px 0;
     font-size: 11px;
+  }
+
+  /* 关于块: 版本/主页/许可/致谢(品牌橙仅 logo 字样, 遵守用色约定) */
+  .about {
+    margin: 10px 2px 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--d-border);
+    font-size: 11px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    color: var(--d-orange);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+  }
+
+  .link {
+    background: none;
+    border: none;
+    padding: 0;
+    height: auto;
+    font-size: 11px;
+    color: var(--d-blue-lt);
+    cursor: pointer;
+  }
+
+  .link:hover {
+    text-decoration: underline;
+    background: none;
+  }
+
+  .credits {
+    flex-basis: 100%;
+    margin: 0;
   }
 
   .spacer {

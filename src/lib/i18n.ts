@@ -72,6 +72,9 @@ export const dict = {
     '编辑器字号/字体/主题在重新进入合并页后生效',
     'Editor font and theme apply when you re-open the merge view',
   ],
+  'set-github': ['项目主页', 'Project homepage'],
+  'set-about-lic': ['MIT 开源 · 不联网 · 无遥测', 'MIT licensed · offline · no telemetry'],
+  'set-about-thanks': ['基于 ', 'Built with '],
 } as const;
 
 /** 词条键 */
