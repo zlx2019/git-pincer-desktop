@@ -1,74 +1,122 @@
 # PINCER · git-pincer-desktop
 
+**English** · [简体中文](README.zh.md)
+
 [![CI](https://github.com/zlx2019/git-pincer-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/zlx2019/git-pincer-desktop/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/zlx2019/git-pincer-desktop?include_prereleases)](https://github.com/zlx2019/git-pincer-desktop/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-8a8f98)
 
-IDEA 风格的 Git 冲突解决桌面端。[git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI) 的姊妹项目——功能对齐、独立实现。
+An IDEA-style Git conflict resolver for the desktop. Sister project of
+[git-pincer](https://github.com/zlx2019/git-pincer) (CLI/TUI) — same feature set,
+independent implementation.
 
-Tauri 2 · SvelteKit (Svelte 5) · CodeMirror 6 · 合并引擎在 Rust (`similar`)。
+Tauri 2 · SvelteKit (Svelte 5) · CodeMirror 6 · merge engine in Rust (`similar`).
 
-<!-- TODO(首个 release 前): assets/screenshots/ 补 菜单小窗 + 三栏大窗 截图, 更好是一张主流程 GIF -->
+<!-- TODO(before first release): screenshots in assets/screenshots/ — compact palette + three-pane merge, ideally a main-flow GIF -->
 
-## 功能
+## Features
 
-- **小窗指令面板** (420×640, 可当侧边小工具): `pull / merge / rebase / cherry-pick / revert`, ⌘1–⌘5 快捷键, 终端式执行输出; 无论操作在面板里发起还是在终端里发起, **一旦出现冲突立刻接管并切换大窗**
-- **Conflicts 列表**: 多选 Accept Yours / Theirs、目录分组、删除冲突处理、二进制 pick-one、`--continue` 循环 (多轮 rebase 自动接力)、Abort
-- **三栏合并编辑器**: chunk 四色底纹 + 词级强调、接缝连接带与 `≫ / ≪ / ✕ / ⟲` 按钮、批量应用非冲突、F7/⇧F7 导航、底部共享横向滚动条、中栏自由编辑 (命中 chunk 即记为已解决)、⌘⏎ Apply 落盘
-- **合并引擎** (Rust, 纯函数): 两次行级 Myers diff + base 区间碰撞分块, 宁可多报冲突不静默错合; >2MB / 500ms 超时降级整文件冲突
+- **Compact command palette** (420×640, works as a side widget): `pull / merge / rebase /
+  cherry-pick / revert` with ⌘1–⌘5 shortcuts and terminal-style output; whether an operation
+  starts in the palette or in your terminal, **the app takes over and switches to the large
+  window the moment conflicts appear**
+- **Conflicts list**: multi-select Accept Yours / Theirs, group by directory, delete-conflict
+  handling, binary pick-one, `--continue` loop (multi-round rebase relays automatically), Abort
+- **Three-pane merge editor**: four-color chunk banding + word-level emphasis, seam ribbons with
+  `≫ / ≪ / ✕ / ⟲` buttons, batch-apply non-conflicting, F7/⇧F7 navigation, a shared horizontal
+  scrollbar, free editing in the center pane (touching a chunk marks it resolved), ⌘⏎ Apply
+- **Merge engine** (Rust, pure functions): two line-level Myers diffs + base-range collision
+  chunking — reports more conflicts rather than silently mis-merging; degrades to a whole-file
+  conflict beyond 2 MB / 500 ms
 
-隐私: **不联网、无遥测**; git 操作直接调用你本机的 git 二进制, 凭据 / 钩子 / rerere 全走你的现有配置。
+Privacy: **no network, no telemetry**; git operations invoke your local git binary, so
+credentials / hooks / rerere all follow your existing configuration.
 
-界面语言分层: 大窗 (Conflicts / 三栏) 保持 IDEA 英文原文 (1:1 还原基准), 小窗辅助文案默认中文; 设置里可切全英文。
+Layered UI language: large windows (Conflicts / three-pane) keep the original IDEA English
+(the 1:1 restoration baseline), small-window helper copy defaults to Chinese; switch to full
+English in Settings.
 
-设计基准见 `docs/IDEA_STYLE.md` 与 `docs/PLAN.md`。
+Design baselines live in `docs/IDEA_STYLE.md` and `docs/PLAN.md`.
 
-## 安装
+## Install
 
-从 [Releases](https://github.com/zlx2019/git-pincer-desktop/releases) 下载对应平台的产物:
+Grab the artifact for your platform from
+[Releases](https://github.com/zlx2019/git-pincer-desktop/releases):
 
-| 平台 | 产物 |
+| Platform | Artifacts |
 |---|---|
 | macOS | `.dmg` |
 | Windows | `.exe` (NSIS) / `.msi` |
-| Linux | `.AppImage` / `.deb` / `.rpm` (依赖 `webkit2gtk`) |
+| Linux | `.AppImage` / `.deb` / `.rpm` (requires `webkit2gtk`) |
 
-当前产物**未做代码签名**, 首次打开需要手动放行 (不是损坏, 是没花钱买证书):
+Current builds are **not code-signed**, so the first launch needs a manual bypass (nothing is
+broken — there is simply no paid certificate):
 
-- **macOS**: 提示"已损坏/无法验证开发者"时, 右键 App → 打开; 仍不行则执行
+- **macOS**: on "damaged / unidentified developer", right-click the app → Open; if that fails run
   `xattr -dr com.apple.quarantine /Applications/git-pincer-desktop.app`
-- **Windows**: SmartScreen 拦截时点 "更多信息 → 仍要运行"
-- **Linux**: AppImage 先 `chmod +x` 再运行
+- **Windows**: when SmartScreen blocks, click "More info → Run anyway"
+- **Linux**: `chmod +x` the AppImage before running
 
-## 开发
+## Try it in 30 seconds
+
+```bash
+scripts/demo-repo.sh          # creates /tmp/pincer-demo with ready-made conflicts
+```
+
+Open `/tmp/pincer-demo` in the app and launch **Merge branch → feature/merge** from the
+palette — the takeover flow, conflicts list and three-pane editor are all one step away.
+
+## Develop
 
 ```bash
 pnpm install
 pnpm tauri dev
 ```
 
-测试数据用主仓库的演练场生成 (含 merge / 两轮 rebase / cherry-pick / revert / 二进制场景):
+Test data can also come from the sister repo's playground (merge / two-round rebase /
+cherry-pick / revert / binary scenarios):
 
 ```bash
 cd ../git-pincer && cargo run --example playground
-cd /tmp/git-pincer-playground && git merge feature/merge   # 或直接在应用菜单里发起
+cd /tmp/git-pincer-playground && git merge feature/merge   # or launch from the app menu
 ```
 
-## 检查
+## Checks
 
 ```bash
-pnpm check && pnpm test && pnpm build                      # svelte-check + vitest + 前端构建
+pnpm check && pnpm test && pnpm build                      # svelte-check + vitest + frontend build
 cd src-tauri
 cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run                                          # 引擎单测 + git 管道集成测试
+cargo nextest run                                          # engine unit tests + git plumbing integration tests
 ```
 
-## 打包与发布
+## Package & Release
 
 ```bash
-pnpm tauri build    # 本机打包: dmg / nsis+msi / AppImage+deb+rpm (按平台)
+pnpm tauri build    # local bundle: dmg / nsis+msi / AppImage+deb+rpm (per platform)
 ```
 
-正式发布 = 推 `v*` 标签走 `release.yml` 四平台矩阵, 流程见 [CONTRIBUTING](CONTRIBUTING.md)。
+An official release = push a `v*` tag to run the four-platform `release.yml` matrix; the process
+is documented in [CONTRIBUTING](CONTRIBUTING.md).
+
+## FAQ
+
+**Why only the conflict flow, and not a full git client?**
+Positioning. Log / commit / push are already served well by your shell and existing GUIs; the
+one moment that still hurts is conflict resolution. PINCER does exactly that slice — launch an
+operation, take over conflicts, resolve in three panes, continue — and nothing else.
+
+**How does it relate to IDEA's built-in merge tool?**
+IDEA's resolver is the interaction benchmark (the UI is a deliberate 1:1 restoration), but you
+get it without opening an IDE: a lightweight (~5 MB) native window over your own git binary,
+with the same take-order semantics as the git-pincer CLI.
+
+**macOS says the app is damaged / from an unidentified developer.**
+Expected for unsigned builds — see [Install](#install). Right-click → Open once, or clear the
+quarantine attribute.
+
+**What does Linux need at runtime?**
+`webkit2gtk` (the Tauri webview). The `.deb` / `.rpm` declare it as a dependency; for the
+AppImage install it from your distribution's repositories.
