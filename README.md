@@ -47,7 +47,7 @@ Grab the artifact for your platform from
 | Platform | Artifacts |
 |---|---|
 | macOS | `.dmg` |
-| Windows | `.exe` (NSIS) / `.msi` |
+| Windows | `.exe` (NSIS) / `.msi` (stable releases only) |
 | Linux | `.AppImage` / `.deb` / `.rpm` (requires `webkit2gtk`) |
 
 Current builds are **not code-signed**, so the first launch needs a manual bypass:

@@ -40,7 +40,7 @@
 | 平台 | 产物 |
 |---|---|
 | macOS | `.dmg` |
-| Windows | `.exe` (NSIS) / `.msi` |
+| Windows | `.exe` (NSIS) / `.msi` (仅稳定版) |
 | Linux | `.AppImage` / `.deb` / `.rpm` (依赖 `webkit2gtk`) |
 
 当前产物**未做代码签名**, 首次打开需要手动放行:

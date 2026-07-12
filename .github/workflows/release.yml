@@ -70,7 +70,10 @@ jobs:
               src-tauri/target/release/bundle/rpm/*.rpm
           - name: windows-x86_64
             os: windows-latest
-            args: ""
+            # MSI 的 ProductVersion 只接受纯数字预发布段(≤65535), 含 rc 之类字母段的
+            # 版本会被 WiX 拒绝——预发布标签(含 "-")只出 NSIS, 稳定版标签 nsis+msi 都出;
+            # 下方上传步骤对未匹配的 msi 通配符只告警不失败(fail_on_unmatched_files 默认 false)
+            args: ${{ contains(github.ref_name, '-') && '--bundles nsis' || '' }}
             bundles: |
               src-tauri/target/release/bundle/nsis/*.exe
               src-tauri/target/release/bundle/msi/*.msi
