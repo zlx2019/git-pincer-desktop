@@ -1,6 +1,7 @@
 <script lang="ts">
   // 设置对话框(菜单小窗入口, 文案随语言设置): 即改即存——每项落定立即生效并持久化,
-  // 无 OK/Cancel 暂存语义; "完成"只是关闭
+  // 无 OK/Cancel 暂存语义; "完成"只是关闭。
+  // 布局分三页签: 通用(语言/关窗) · 界面(主题/编辑器) · 关于; 正文区定高, 切页不跳动
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { t } from '$lib/i18n.svelte';
@@ -8,7 +9,10 @@
 
   let { onclose }: { onclose: () => void } = $props();
 
-  // 关于块的版本号(壳层查询; mock/测试环境拿不到就不显示)
+  const TABS = ['general', 'ui', 'about'] as const;
+  let tab = $state<(typeof TABS)[number]>('general');
+
+  // 关于页的版本号(壳层查询; mock/测试环境拿不到就不显示)
   let version = $state('');
   getVersion()
     .then((v) => (version = v ?? ''))
@@ -54,125 +58,150 @@
 <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
   <div class="modal" role="dialog" aria-modal="true" aria-label={t('set-title')}>
     <h3>{t('set-title')}</h3>
-    <div class="rows">
-      <div class="row">
-        <span class="lbl">{t('set-theme')}</span>
-        <div class="seg" role="radiogroup" aria-label={t('set-theme')}>
-          <button
-            class:on={settings.value.theme === 'dark'}
-            onclick={() => updateSettings({ theme: 'dark' })}>{t('set-theme-dark')}</button
-          >
-          <button
-            class:on={settings.value.theme === 'light'}
-            onclick={() => updateSettings({ theme: 'light' })}>{t('set-theme-light')}</button
-          >
+
+    <div class="tabs" role="tablist">
+      {#each TABS as tb (tb)}
+        <button
+          class="tab"
+          class:on={tab === tb}
+          role="tab"
+          aria-selected={tab === tb}
+          onclick={() => (tab = tb)}>{t(`set-tab-${tb}`)}</button
+        >
+      {/each}
+    </div>
+
+    <div class="body">
+      {#if tab === 'general'}
+        <div class="rows">
+          <div class="row">
+            <span class="lbl">{t('set-lang')}</span>
+            <div class="seg" role="radiogroup" aria-label={t('set-lang')}>
+              <button
+                class:on={settings.value.language === 'zh'}
+                onclick={() => updateSettings({ language: 'zh' })}>中文</button
+              >
+              <button
+                class:on={settings.value.language === 'en'}
+                onclick={() => updateSettings({ language: 'en' })}>English</button
+              >
+            </div>
+          </div>
+
+          <div class="row">
+            <span class="lbl">{t('set-close')}</span>
+            <div class="seg" role="radiogroup" aria-label={t('set-close')}>
+              <button
+                class:on={settings.value.closeBehavior === 'tray'}
+                onclick={() => updateSettings({ closeBehavior: 'tray' })}
+                >{t('set-close-tray')}</button
+              >
+              <button
+                class:on={settings.value.closeBehavior === 'quit'}
+                onclick={() => updateSettings({ closeBehavior: 'quit' })}
+                >{t('set-close-quit')}</button
+              >
+            </div>
+          </div>
         </div>
-      </div>
+      {:else if tab === 'ui'}
+        <div class="rows">
+          <div class="row">
+            <span class="lbl">{t('set-theme')}</span>
+            <div class="seg" role="radiogroup" aria-label={t('set-theme')}>
+              <button
+                class:on={settings.value.theme === 'dark'}
+                onclick={() => updateSettings({ theme: 'dark' })}>{t('set-theme-dark')}</button
+              >
+              <button
+                class:on={settings.value.theme === 'light'}
+                onclick={() => updateSettings({ theme: 'light' })}>{t('set-theme-light')}</button
+              >
+            </div>
+          </div>
 
-      <div class="row">
-        <span class="lbl">{t('set-lang')}</span>
-        <div class="seg" role="radiogroup" aria-label={t('set-lang')}>
-          <button
-            class:on={settings.value.language === 'zh'}
-            onclick={() => updateSettings({ language: 'zh' })}>中文</button
-          >
-          <button
-            class:on={settings.value.language === 'en'}
-            onclick={() => updateSettings({ language: 'en' })}>English</button
-          >
+          <label class="row">
+            <span class="lbl">{t('set-font-size')}</span>
+            <span class="ctl">
+              <input
+                class="num"
+                type="number"
+                min="8"
+                max="32"
+                value={settings.value.editorFontSize}
+                onchange={commitSize}
+              />
+              <span class="unit dim">px</span>
+            </span>
+          </label>
+
+          <label class="row">
+            <span class="lbl">{t('set-font-family')}</span>
+            <span class="selwrap">
+              <select class="txt sel" value={fontChoice} onchange={pickFamily}>
+                <option value="">{t('set-font-emb', EMBEDDED_FONTS[0])}</option>
+                {#each EMBEDDED_FONTS.slice(1) as f (f)}
+                  <option value={f}>{t('set-font-emb', f)}</option>
+                {/each}
+                <option value="__custom">{t('set-font-custom')}</option>
+              </select>
+            </span>
+          </label>
+
+          {#if fontChoice === '__custom'}
+            <label class="row">
+              <span class="lbl"></span>
+              <input
+                class="txt mono"
+                type="text"
+                placeholder={t('set-font-ph')}
+                value={isCustomFamily(settings.value.editorFontFamily)
+                  ? settings.value.editorFontFamily
+                  : ''}
+                onchange={commitFamily}
+              />
+            </label>
+          {/if}
+
+          <label class="row">
+            <span class="lbl">{t('set-words')}</span>
+            <input
+              type="checkbox"
+              checked={settings.value.highlightWords}
+              onchange={(e) =>
+                updateSettings({ highlightWords: (e.currentTarget as HTMLInputElement).checked })}
+            />
+          </label>
         </div>
-      </div>
-
-      <label class="row">
-        <span class="lbl">{t('set-font-size')}</span>
-        <span class="ctl">
-          <input
-            class="num"
-            type="number"
-            min="8"
-            max="32"
-            value={settings.value.editorFontSize}
-            onchange={commitSize}
-          />
-          <span class="unit dim">px</span>
-        </span>
-      </label>
-
-      <label class="row">
-        <span class="lbl">{t('set-font-family')}</span>
-        <span class="selwrap">
-          <select class="txt sel" value={fontChoice} onchange={pickFamily}>
-            <option value="">{t('set-font-emb', EMBEDDED_FONTS[0])}</option>
-            {#each EMBEDDED_FONTS.slice(1) as f (f)}
-              <option value={f}>{t('set-font-emb', f)}</option>
-            {/each}
-            <option value="__custom">{t('set-font-custom')}</option>
-          </select>
-        </span>
-      </label>
-
-      {#if fontChoice === '__custom'}
-        <label class="row">
-          <span class="lbl"></span>
-          <input
-            class="txt mono"
-            type="text"
-            placeholder={t('set-font-ph')}
-            value={isCustomFamily(settings.value.editorFontFamily)
-              ? settings.value.editorFontFamily
-              : ''}
-            onchange={commitFamily}
-          />
-        </label>
+        <p class="note dim">{t('set-editor-note')}</p>
+      {:else}
+        <div class="about">
+          <div class="brand">PINCER</div>
+          <div class="aver dim">git-pincer-desktop{version ? ` · v${version}` : ''}</div>
+          <button
+            class="link"
+            onclick={() => openUrl('https://github.com/zlx2019/git-pincer-desktop').catch(() => {})}
+            >{t('set-github')}</button
+          >
+          <p class="credits dim">{t('set-about-lic')}</p>
+          <p class="credits dim">
+            {t('set-about-thanks')}similar · CodeMirror 6 · JetBrains Mono · Maple Mono ·
+            file-icons
+          </p>
+        </div>
       {/if}
-
-      <div class="row">
-        <span class="lbl">{t('set-close')}</span>
-        <div class="seg" role="radiogroup" aria-label={t('set-close')}>
-          <button
-            class:on={settings.value.closeBehavior === 'tray'}
-            onclick={() => updateSettings({ closeBehavior: 'tray' })}>{t('set-close-tray')}</button
-          >
-          <button
-            class:on={settings.value.closeBehavior === 'quit'}
-            onclick={() => updateSettings({ closeBehavior: 'quit' })}>{t('set-close-quit')}</button
-          >
-        </div>
-      </div>
-
-      <label class="row">
-        <span class="lbl">{t('set-words')}</span>
-        <input
-          type="checkbox"
-          checked={settings.value.highlightWords}
-          onchange={(e) =>
-            updateSettings({ highlightWords: (e.currentTarget as HTMLInputElement).checked })}
-        />
-      </label>
     </div>
-    <p class="note dim">{t('set-editor-note')}</p>
-    <div class="about">
-      <span class="brand">PINCER</span>
-      {#if version}<span class="dim">v{version}</span>{/if}
-      <span class="dim">·</span>
-      <button
-        class="link"
-        onclick={() => openUrl('https://github.com/zlx2019/git-pincer-desktop').catch(() => {})}
-        >{t('set-github')}</button
-      >
-      <p class="credits dim">{t('set-about-lic')}</p>
-      <p class="credits dim">
-        {t('set-about-thanks')}similar · CodeMirror 6 · JetBrains Mono · Maple Mono · file-icons
-      </p>
-    </div>
+
     <footer>
-      <button
-        onclick={() => {
-          customFont = false;
-          updateSettings({ ...DEFAULT_SETTINGS });
-        }}>{t('set-reset')}</button
-      >
-      <span class="hint dim">{t('set-hint')}</span>
+      {#if tab !== 'about'}
+        <button
+          onclick={() => {
+            customFont = false;
+            updateSettings({ ...DEFAULT_SETTINGS });
+          }}>{t('set-reset')}</button
+        >
+        <span class="hint dim">{t('set-hint')}</span>
+      {/if}
       <span class="spacer"></span>
       <button class="primary" onclick={onclose}>{t('set-done')}</button>
     </footer>
@@ -202,9 +231,52 @@
   }
 
   h3 {
-    margin: 0 0 10px;
+    margin: 0 0 8px;
     font-size: 13px;
     font-weight: 600;
+  }
+
+  /* 页签条: 活动态橙色下划线(用色约定允许的"活动 tab 下划线", 与终端 tab 同语言) */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--d-border);
+  }
+
+  .tab {
+    position: relative;
+    height: 26px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    font-size: 12px;
+    color: var(--d-dim);
+  }
+
+  .tab:hover {
+    color: var(--d-text);
+    background: none;
+  }
+
+  .tab.on {
+    color: var(--d-text);
+  }
+
+  .tab.on::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: -1px;
+    height: 2px;
+    background: var(--d-orange);
+  }
+
+  /* 正文定高: 三个页签内容高度不同, 切换时对话框不跳动 */
+  .body {
+    min-height: 176px;
   }
 
   .rows {
@@ -292,7 +364,7 @@
     font-size: 11px;
   }
 
-  /* 双段选择(收进托盘/退出应用): 复用工具栏 .on 的选中蓝 */
+  /* 双段选择: 复用工具栏 .on 的选中蓝 */
   .seg {
     display: inline-flex;
     border: 1px solid var(--d-border-strong);
@@ -339,28 +411,31 @@
     font-size: 11px;
   }
 
-  /* 三栏编辑器随路由新建, 相关设置非即时生效: 对话框内注明避免"没反应"误判 */
+  /* 三栏编辑器随路由新建, 相关设置非即时生效: 界面页签内注明避免"没反应"误判 */
   .note {
     margin: 8px 2px 0;
     font-size: 11px;
   }
 
-  /* 关于块: 版本/主页/许可/致谢(品牌橙仅 logo 字样, 遵守用色约定) */
+  /* 关于页签: 居中品牌块(品牌橙仅 logo 字样, 遵守用色约定) */
   .about {
-    margin: 10px 2px 0;
-    padding-top: 8px;
-    border-top: 1px solid var(--d-border);
-    font-size: 11px;
+    min-height: 176px;
     display: flex;
-    align-items: baseline;
-    gap: 6px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
   }
 
   .brand {
     color: var(--d-orange);
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.18em;
+    font-size: 16px;
+  }
+
+  .aver {
     font-size: 11px;
   }
 
@@ -380,8 +455,9 @@
   }
 
   .credits {
-    flex-basis: 100%;
     margin: 0;
+    font-size: 11px;
+    max-width: 260px;
   }
 
   .spacer {

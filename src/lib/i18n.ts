@@ -52,6 +52,9 @@ export const dict = {
 
   // 设置对话框
   'set-title': ['设置', 'Settings'],
+  'set-tab-general': ['通用', 'General'],
+  'set-tab-ui': ['界面', 'Interface'],
+  'set-tab-about': ['关于', 'About'],
   'set-theme': ['主题', 'Theme'],
   'set-theme-dark': ['深色', 'Dark'],
   'set-theme-light': ['浅色', 'Light'],
