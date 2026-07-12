@@ -21,12 +21,13 @@ type TrayItems = (
     tauri::menu::MenuItem<tauri::Wry>,
 );
 
-/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态 + 用户设置(启动时从盘加载)
-/// + 托盘/应用菜单句柄(语言切换就地改文案)
+/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态与各形态最近位置(仅本次运行,
+/// 不落盘——启动永远居中) + 用户设置(启动时从盘加载) + 托盘/应用菜单句柄(语言切换就地改文案)
 #[derive(Default)]
 pub struct AppState {
     repo: Mutex<Option<Repo>>,
     win_form: Mutex<Option<WinForm>>,
+    win_pos: Mutex<[Option<tauri::PhysicalPosition<i32>>; 2]>,
     settings: Mutex<Settings>,
     tray: Mutex<Option<TrayItems>>,
     menu_settings: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
@@ -106,6 +107,16 @@ pub enum WinForm {
     Large,
 }
 
+impl WinForm {
+    /// 位置记忆槽位(AppState::win_pos 下标)
+    const fn idx(self) -> usize {
+        match self {
+            Self::Compact => 0,
+            Self::Large => 1,
+        }
+    }
+}
+
 /// 仓库概要: 打开页与列表页头部所需的全部信息
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -167,24 +178,30 @@ pub struct OutputLine {
     pub line: String,
 }
 
-/// 应用窗口形态: 最小尺寸/尺寸/居中一次完成(单次 IPC, 无多段跳变);
-/// 形态未变时为空操作——不把用户手动移动或调整过的窗口拽回屏幕中心
+/// 应用窗口形态: 最小尺寸/尺寸/定位一次完成(单次 IPC, 无多段跳变);
+/// 形态未变时为空操作——不把用户手动移动或调整过的窗口拽回屏幕中心。
+/// 定位规则: 切换时记住旧形态当前位置, 该形态本次运行内出现过就原位恢复
+/// (位置需仍落在某块屏幕上, 防拔外接屏后恢复到屏外), 首次出现才居中——
+/// 即启动居中, 冲突处理完/失败回小窗时回到进大窗前的位置
 #[tauri::command]
 pub async fn set_window_form(
     app: AppHandle,
     state: State<'_, AppState>,
     form: WinForm,
 ) -> Result<(), ShellError> {
-    {
+    let prev = {
         let mut cur = state.win_form.lock().unwrap_or_else(|e| e.into_inner());
         if *cur == Some(form) {
             return Ok(());
         }
-        *cur = Some(form);
-    }
+        cur.replace(form)
+    };
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());
     };
+    if let (Some(prev), Ok(pos)) = (prev, win.outer_position()) {
+        state.win_pos.lock().unwrap_or_else(|e| e.into_inner())[prev.idx()] = Some(pos);
+    }
     let ((min_w, min_h), (w, h)) = match form {
         WinForm::Compact => ((380.0, 520.0), (420.0, 640.0)),
         WinForm::Large => ((960.0, 640.0), (1280.0, 800.0)),
@@ -193,8 +210,26 @@ pub async fn set_window_form(
         .map_err(join_err)?;
     win.set_size(tauri::LogicalSize::new(w, h))
         .map_err(join_err)?;
-    win.center().map_err(join_err)?;
+    let saved = state.win_pos.lock().unwrap_or_else(|e| e.into_inner())[form.idx()];
+    match saved.filter(|p| on_screen(&win, *p)) {
+        Some(p) => win.set_position(p).map_err(join_err)?,
+        None => win.center().map_err(join_err)?,
+    }
     Ok(())
+}
+
+/// 窗口左上角(标题栏抓手)是否仍落在某块屏幕内; 查询失败按不可见处理(回退居中)
+fn on_screen(win: &tauri::WebviewWindow, pos: tauri::PhysicalPosition<i32>) -> bool {
+    let Ok(monitors) = win.available_monitors() else {
+        return false;
+    };
+    monitors.iter().any(|m| {
+        let (mp, ms) = (m.position(), m.size());
+        pos.x >= mp.x
+            && pos.x < mp.x + ms.width as i32
+            && pos.y >= mp.y
+            && pos.y < mp.y + ms.height as i32
+    })
 }
 
 /// 当前用户设置
