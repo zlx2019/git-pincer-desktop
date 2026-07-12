@@ -6,6 +6,12 @@ import type { Language } from './api';
 
 /** [zh, en] 词条表 */
 export const dict = {
+  // 打开页: 最近列表空态
+  'open-recent-empty': [
+    '最近打开的仓库会出现在这里',
+    'Recently opened repositories will appear here',
+  ],
+
   // 菜单: 品牌行 / 指令行
   'brand-sub': ['指令面板', 'Command palette'],
   'act-pull': ['拉取远端', 'Pull remote'],

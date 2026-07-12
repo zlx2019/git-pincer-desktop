@@ -5,11 +5,14 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { api } from '$lib/api';
+  import { t } from '$lib/i18n.svelte';
   import { session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
 
   let recent: string[] = $state([]);
+  // 空态提示等列表拿到后再出, 避免 IPC 返回前闪一下
+  let recentLoaded = $state(false);
   let opening = $state(false);
 
   onMount(() => {
@@ -20,7 +23,8 @@
     api
       .recentRepos()
       .then((r) => (recent = r))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => (recentLoaded = true));
     // 拖拽文件夹进窗口 = 打开仓库
     let unlisten: (() => void) | undefined;
     getCurrentWebview()
@@ -107,9 +111,10 @@
     <button class="primary" disabled={opening} onclick={pickAndOpen}>Open Repository…</button>
   </div>
 
-  {#if recent.length}
-    <section class="recent">
-      <h2>RECENT</h2>
+  <!-- IDEA Welcome 风格: 分割线下方列表区常驻, 空列表时以提示占位不显空旷 -->
+  <section class="recent">
+    <h2>RECENT</h2>
+    {#if recent.length}
       {#each recent as path (path)}
         <div class="rrow-wrap">
           <button class="rrow" onclick={() => openRepo(path)}>
@@ -121,8 +126,10 @@
           </button>
         </div>
       {/each}
-    </section>
-  {/if}
+    {:else if recentLoaded}
+      <p class="rempty">{t('open-recent-empty')}</p>
+    {/if}
+  </section>
 </main>
 
 <style>
@@ -164,10 +171,13 @@
     border-color: #2f63d6;
   }
 
+  /* IDEA Welcome 语法: 一条分割线划出列表区, 行静止透明、hover 才提亮 */
   .recent {
     width: 100%;
     max-width: 360px;
     margin-top: 34px;
+    padding-top: 14px;
+    border-top: 1px solid var(--d-border);
   }
 
   .recent h2 {
@@ -195,6 +205,13 @@
     background: transparent;
     color: var(--d-text);
     text-align: left;
+  }
+
+  .rempty {
+    margin: 2px 0 0;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--d-dimmer);
   }
 
   /* hover 提亮挂在包装层: 悬停删除键时行高亮不熄灭 */
