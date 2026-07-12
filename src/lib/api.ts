@@ -14,6 +14,14 @@ export interface RepoInfo {
   dirty: number;
 }
 
+/** 最近列表的一项(目录已删除/移动的项置灰展示, 由用户手动移除) */
+export interface RecentRepo {
+  /** 仓库根路径 */
+  path: string;
+  /** 目录已不存在 */
+  missing: boolean;
+}
+
 /** 可从菜单发起的操作 */
 export type LaunchKind = 'pull' | 'merge' | 'rebase' | 'cherry-pick' | 'revert';
 
@@ -146,8 +154,8 @@ export const api = {
   saveResult: (path: string, text: string) => invoke<void>('save_result', { path, text }),
   continueOp: () => invoke<RoundOutcome>('continue_op'),
   abortOp: () => invoke<void>('abort_op'),
-  recentRepos: () => invoke<string[]>('recent_repos'),
-  recentRemove: (path: string) => invoke<string[]>('recent_remove', { path }),
+  recentRepos: () => invoke<RecentRepo[]>('recent_repos'),
+  recentRemove: (path: string) => invoke<RecentRepo[]>('recent_remove', { path }),
   launchOp: (kind: LaunchKind, targets: string[]) =>
     invoke<LaunchOutcome>('launch_op', { kind, targets }),
   branches: () => invoke<Branch[]>('branches'),

@@ -55,8 +55,8 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `save_result(path, text)` | 写工作区文件 + `git add` (三栏 Apply / binary 选择共用) |
 | `continue_op()` | `git <op> --continue` 管道捕获, stdout/err 聚批发事件; 退出非零且仍有冲突 = 新一轮 (rebase), 否则报错 |
 | `abort_op()` | `git <op> --abort` (rebase 用 `--abort`, merge 用 `merge --abort`) |
-| `recent_repos() → path[]` | 最近打开列表 (tauri app-data 存 JSON); 目录选择器由前端直接走 tauri-plugin-dialog, 不设专门命令 |
-| `recent_remove(path) → path[]` | 从最近列表移除一项, 返回过滤后列表 |
+| `recent_repos() → {path, missing}[]` | 最近打开列表 (tauri app-data 存 JSON); 目录已删/移动的项标记 missing 置灰保留、点击提示、× 手动移除(IDEA 行为, 2026-07-12 定, 原为自动剔除), 打开页聚焦时重拉; 目录选择器由前端直接走 tauri-plugin-dialog, 不设专门命令 |
+| `recent_remove(path) → {path, missing}[]` | 从最近列表移除一项, 返回更新后列表 |
 | `switch_branch(name)` | `git switch`(菜单顶栏分支 chip, 仅无进行中操作时可用) |
 | `launch_op(kind, targets[]) → LaunchOutcome` | 菜单发起五操作; 输出走 `git://output`; 结束探测: 有冲突 → `Conflicts{files}`, 零退出 → `CleanDone`, 否则 `Failed`; 注入 `GIT_TERMINAL_PROMPT=0` 防无终端挂起 |
 | `branches() → Branch[]` | 本地分支(带当前标记), merge/rebase 对话框数据 |

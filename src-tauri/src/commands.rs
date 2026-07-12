@@ -546,22 +546,39 @@ pub async fn abort_op(state: State<'_, AppState>) -> Result<(), ShellError> {
     .map_err(join_err)?
 }
 
-/// 最近打开过的仓库路径(最新在前, 已不存在的目录自动剔除)
+/// 最近列表的一项: 路径 + 目录是否已不存在
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentRepo {
+    /// 仓库根路径
+    pub path: String,
+    /// 目录已不存在(被删除/移动); 对齐 IDEA: 保留展示但置灰, 由用户手动移除
+    pub missing: bool,
+}
+
+/// 存储的路径列表 → 响应条目(标记已消失的目录)
+fn recent_entries(list: Vec<String>) -> Vec<RecentRepo> {
+    list.into_iter()
+        .map(|p| RecentRepo {
+            missing: !Path::new(&p).is_dir(),
+            path: p,
+        })
+        .collect()
+}
+
+/// 最近打开过的仓库(最新在前); 目录已不存在的项标记 missing 置灰保留(IDEA 行为), 不自动剔除
 #[tauri::command]
-pub async fn recent_repos(app: AppHandle) -> Result<Vec<String>, ShellError> {
-    Ok(load_recent(&app)
-        .into_iter()
-        .filter(|p| Path::new(p).is_dir())
-        .collect())
+pub async fn recent_repos(app: AppHandle) -> Result<Vec<RecentRepo>, ShellError> {
+    Ok(recent_entries(load_recent(&app)))
 }
 
 /// 从最近列表移除一个路径(打开页的删除按钮), 返回更新后的列表
 #[tauri::command]
-pub async fn recent_remove(app: AppHandle, path: String) -> Result<Vec<String>, ShellError> {
+pub async fn recent_remove(app: AppHandle, path: String) -> Result<Vec<RecentRepo>, ShellError> {
     let mut list = load_recent(&app);
     list.retain(|p| p != &path);
     save_recent(&app, &list);
-    Ok(list.into_iter().filter(|p| Path::new(p).is_dir()).collect())
+    Ok(recent_entries(list))
 }
 
 /// 取当前仓库的克隆(仅两个 PathBuf), 避免跨 await 持锁

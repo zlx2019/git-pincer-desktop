@@ -51,39 +51,51 @@ export const ideaThemeDark = EditorView.theme(themeSpec, { dark: true });
 /** IDEA New UI 亮色编辑器外观 */
 export const ideaThemeLight = EditorView.theme(themeSpec, { dark: false });
 
-/** IDEA Dark 代码配色(近似初值, M5 逐像素校准) */
-export const ideaHighlightDark = HighlightStyle.define([
-  { tag: [t.keyword, t.modifier, t.operatorKeyword], color: '#cf8e6d' },
-  { tag: [t.string, t.special(t.string), t.regexp], color: '#6aab73' },
-  { tag: [t.comment, t.blockComment], color: '#7a7e85', fontStyle: 'italic' },
-  { tag: [t.number, t.bool], color: '#2aacb8' },
-  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: '#56a8f5' },
-  { tag: [t.typeName, t.className, t.namespace], color: '#c77dbb' },
-  { tag: t.propertyName, color: '#c77dbb' },
-  { tag: [t.meta, t.annotation], color: '#b3ae60' },
-  { tag: t.tagName, color: '#d5b778' },
-  { tag: t.attributeName, color: '#c77dbb' },
+/** Maple 暗色代码配色(源: subframe7536/vscode-theme-maple, maple-dark 映射到 lezer tags) */
+export const mapleHighlightDark = HighlightStyle.define([
+  { tag: [t.keyword, t.modifier, t.operatorKeyword], color: '#d2ccff' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: '#a4dfae' },
+  { tag: [t.comment, t.blockComment], color: '#999999' },
+  { tag: t.number, color: '#d5f288' },
+  { tag: t.bool, color: '#d2ccff' },
+  { tag: t.null, color: '#e3cbeb', fontStyle: 'italic' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: '#8fc7ff' },
+  { tag: [t.typeName, t.className], color: '#f0c0a8' },
+  { tag: t.namespace, color: '#e3cbeb' },
+  { tag: t.propertyName, color: '#ded6cf' },
+  { tag: [t.meta, t.annotation], color: '#eecfa0' },
+  { tag: t.tagName, color: '#edabab' },
+  { tag: t.attributeName, color: '#eecfa0' },
+  { tag: [t.variableName, t.special(t.variableName)], color: '#eecfa0' },
+  { tag: t.self, color: '#f0c0a8' },
+  { tag: [t.operator, t.punctuation], color: '#b8d7f9' },
 ]);
 
-/** IDEA Light 代码配色(近似初值, M5 逐像素校准) */
-export const ideaHighlightLight = HighlightStyle.define([
-  { tag: [t.keyword, t.modifier, t.operatorKeyword], color: '#0033b3' },
-  { tag: [t.string, t.special(t.string), t.regexp], color: '#067d17' },
-  { tag: [t.comment, t.blockComment], color: '#8c8c8c', fontStyle: 'italic' },
-  { tag: [t.number, t.bool], color: '#1750eb' },
-  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: '#00627a' },
-  { tag: [t.typeName, t.className, t.namespace], color: '#7a3e9d' },
-  { tag: t.propertyName, color: '#871094' },
-  { tag: [t.meta, t.annotation], color: '#9e880d' },
-  { tag: t.tagName, color: '#0033b3' },
-  { tag: t.attributeName, color: '#174ad4' },
+/** Maple 亮色代码配色(源: subframe7536/vscode-theme-maple, maple-light 映射到 lezer tags) */
+export const mapleHighlightLight = HighlightStyle.define([
+  { tag: [t.keyword, t.modifier, t.operatorKeyword], color: '#726293' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: '#478f14' },
+  { tag: [t.comment, t.blockComment], color: '#808080' },
+  { tag: t.number, color: '#739900' },
+  { tag: t.bool, color: '#726293' },
+  { tag: t.null, color: '#a65973', fontStyle: 'italic' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: '#0585a8' },
+  { tag: [t.typeName, t.className], color: '#c37522' },
+  { tag: t.namespace, color: '#a65973' },
+  { tag: t.propertyName, color: '#8d8949' },
+  { tag: [t.meta, t.annotation], color: '#aa830e' },
+  { tag: t.tagName, color: '#bd5151' },
+  { tag: t.attributeName, color: '#aa830e' },
+  { tag: [t.variableName, t.special(t.variableName)], color: '#aa830e' },
+  { tag: t.self, color: '#c37522' },
+  { tag: [t.operator, t.punctuation], color: '#71a3a8' },
 ]);
 
 /** 按主题取编辑器外观扩展(主题 + 语法高亮) */
 export function appearanceExtensions(light: boolean): Extension[] {
   return [
     light ? ideaThemeLight : ideaThemeDark,
-    syntaxHighlighting(light ? ideaHighlightLight : ideaHighlightDark, { fallback: true }),
+    syntaxHighlighting(light ? mapleHighlightLight : mapleHighlightDark, { fallback: true }),
   ];
 }
 
