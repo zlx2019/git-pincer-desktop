@@ -6,10 +6,8 @@ authors = ["Zero <zero9501@outlook.com>"]
 edition = "2024"
 rust-version = "1.96.0"
 license = "MIT"
-# readme 相对本 Cargo.toml 解析, 仓库 README 在上一级
 readme = "../README.md"
 repository = "https://github.com/zlx2019/git-pincer-desktop"
-# crates.io 约束: keywords ≤5 个(搜索词); categories ≤5 个且必须取官方分类 slug
 keywords = ["git", "merge", "conflict", "diff", "tauri"]
 categories = ["development-tools", "gui", "text-editors"]
 
