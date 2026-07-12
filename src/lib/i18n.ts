@@ -6,10 +6,14 @@ import type { Language } from './api';
 
 /** [zh, en] 词条表 */
 export const dict = {
-  // 打开页: 最近列表空态
+  // 打开页: 最近列表空态 / 目录已删除的置灰项
   'open-recent-empty': [
     '最近打开的仓库会出现在这里',
     'Recently opened repositories will appear here',
+  ],
+  'open-missing': [
+    '仓库目录已不存在, 可用 × 从列表移除',
+    'Repository folder no longer exists — remove it with ×',
   ],
 
   // 菜单: 品牌行 / 指令行

@@ -4,27 +4,32 @@
   import { goto, preloadCode } from '$app/navigation';
   import { open } from '@tauri-apps/plugin-dialog';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
-  import { api } from '$lib/api';
+  import { api, type RecentRepo } from '$lib/api';
   import { t } from '$lib/i18n.svelte';
   import { session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
 
-  let recent: string[] = $state([]);
+  let recent: RecentRepo[] = $state([]);
   // 空态提示等列表拿到后再出, 避免 IPC 返回前闪一下
   let recentLoaded = $state(false);
   let opening = $state(false);
+
+  /** 拉取最近列表(挂载与窗口聚焦时): 外部删除/移动仓库即时反映置灰 */
+  function refreshRecent() {
+    api
+      .recentRepos()
+      .then((r) => (recent = r))
+      .catch(() => {})
+      .finally(() => (recentLoaded = true));
+  }
 
   onMount(() => {
     compactWindow().catch(() => {});
     // 两个可能的下一站预热: 打开仓库时目标页已就绪
     preloadCode('/menu').catch(() => {});
     preloadCode('/conflicts').catch(() => {});
-    api
-      .recentRepos()
-      .then((r) => (recent = r))
-      .catch(() => {})
-      .finally(() => (recentLoaded = true));
+    refreshRecent();
     // 拖拽文件夹进窗口 = 打开仓库
     let unlisten: (() => void) | undefined;
     getCurrentWebview()
@@ -73,6 +78,8 @@
   }
 </script>
 
+<svelte:window onfocus={refreshRecent} />
+
 <main class="win">
   <div class="hero">
     <!-- v2 logo 图形(几何同 assets/icon.svg): 挖空处用页面底色 token, 亮暗主题自适应 -->
@@ -115,13 +122,16 @@
   <section class="recent">
     <h2>RECENT</h2>
     {#if recent.length}
-      {#each recent as path (path)}
-        <div class="rrow-wrap">
-          <button class="rrow" onclick={() => openRepo(path)}>
-            <span class="rname">{basename(path)}</span>
-            <span class="rpath mono">{path}</span>
+      {#each recent as r (r.path)}
+        <div class="rrow-wrap" class:missing={r.missing}>
+          <button
+            class="rrow"
+            onclick={() => (r.missing ? toast(t('open-missing')) : openRepo(r.path))}
+          >
+            <span class="rname">{basename(r.path)}</span>
+            <span class="rpath mono">{r.path}</span>
           </button>
-          <button class="rdel" title="Remove from recent" onclick={() => removeRecent(path)}>
+          <button class="rdel" title="Remove from recent" onclick={() => removeRecent(r.path)}>
             <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
           </button>
         </div>
@@ -211,6 +221,15 @@
     margin: 2px 0 0;
     padding: 6px 8px;
     font-size: 11px;
+    color: var(--d-dimmer);
+  }
+
+  /* 目录已删除/移动: IDEA 式整行置灰(保留展示, 待用户手动移除) */
+  .rrow-wrap.missing .rname {
+    color: var(--d-dim);
+  }
+
+  .rrow-wrap.missing .rpath {
     color: var(--d-dimmer);
   }
 
