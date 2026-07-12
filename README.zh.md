@@ -78,7 +78,4 @@ IDEA 的解决器是交互基准 (UI 刻意 1:1 还原), 但不用为它打开�
 
 ## License
 
-[MIT](LICENSE) · 基于 [similar](https://github.com/mitsuhiko/similar)、
-[CodeMirror 6](https://codemirror.net) 与 [Tauri](https://tauri.app); 内嵌字体
-JetBrains Mono 与 Maple Mono (OFL 1.1), 文件图标来自
-[file-icons](https://github.com/file-icons) (ISC / MIT)。
+[MIT](LICENSE)

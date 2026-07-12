@@ -87,7 +87,4 @@ AppImage install it from your distribution's repositories.
 
 ## License
 
-[MIT](LICENSE) · built with [similar](https://github.com/mitsuhiko/similar),
-[CodeMirror 6](https://codemirror.net) and [Tauri](https://tauri.app); bundled fonts
-JetBrains Mono & Maple Mono (OFL 1.1), file icons from
-[file-icons](https://github.com/file-icons) (ISC / MIT).
+[MIT](LICENSE)
