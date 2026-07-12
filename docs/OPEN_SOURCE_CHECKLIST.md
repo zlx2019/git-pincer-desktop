@@ -88,7 +88,8 @@ macOS `icon_as_template(true)` 内嵌加载 (tauri 开 `image-png` feature), 其
 - Rust 侧 `TrayIconBuilder.icon_as_template(true)` (macOS), Windows/Linux 继续用彩色版;
 - 源文件放 `assets/tray.svg`, 与 icon.svg 同风格。
 
-### 2.2 冲突列表按文件类型出图标 (对齐 IDEA)
+### 2.2 冲突列表按文件类型出图标 (对齐 IDEA) — ✅ 完成 (2026-07-12)
+`src/lib/fileicon.ts`: 扩展名 → 字母徽章/图形 SVG + 既有 token 低饱和品类色 (rs/ts/js/svelte/vue/json/toml/yaml/lock/md/txt/html/xml/css/py/go/java/kt/c/cpp/sh + 图片类), 未知与二进制回落通用文档图标; 冲突列表与三栏 header 共用, vitest 覆盖映射。
 现在所有文件共用一枚通用文档图标 (`conflicts/+page.svelte` 的 `.ficon`)。
 IDEA 的列表是按类型着色图标, 辨识度高很多。做法 (不违反"无 UI 组件库"约定):
 

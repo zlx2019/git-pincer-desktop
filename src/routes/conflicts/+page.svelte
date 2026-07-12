@@ -6,6 +6,7 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, opTitleSegments, type FileRow, type OutputLine } from '$lib/api';
   import { rafBatcher } from '$lib/batch';
+  import { fileIcon } from '$lib/fileicon';
   import { t } from '$lib/i18n.svelte';
   import { largeWindow } from '$lib/win';
   import { pushTerm, session } from '$lib/state.svelte';
@@ -296,19 +297,14 @@
                 {#each g.files as f (f.path)}
                   {@const [fname, fdir] = splitPath(f.path)}
                   {@const index = flat.indexOf(f)}
+                  {@const fi = fileIcon(f.path)}
                   <tr
                     class:selected={selected.has(f.path)}
                     onclick={(e) => clickRow(e, f.path, index)}
                     ondblclick={() => dblclickRow(f.path, index)}
                   >
                     <td class="name">
-                      <svg class="ficon" viewBox="0 0 16 16" width="13" height="13">
-                        <path
-                          fill="none"
-                          stroke="currentColor"
-                          d="M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3"
-                        />
-                      </svg>
+                      <span class="ficon" style="color:{fi.color}">{@html fi.svg}</span>
                       <span class="fname">{fname}</span>
                       {#if fdir && !groupByDir}<span class="fdir dim">{fdir}</span>{/if}
                       {#if f.binary}<span class="badge dim">binary</span>{/if}
@@ -447,8 +443,9 @@
     gap: 6px;
   }
 
+  /* 品类色由 fileicon.ts 内联(currentColor 着色) */
   .ficon {
-    color: var(--d-dim);
+    display: inline-flex;
     flex: none;
   }
 

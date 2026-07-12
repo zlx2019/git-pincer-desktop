@@ -21,6 +21,7 @@
   } from '$lib/chunks';
   import { session } from '$lib/state.svelte';
   import { ensureEditorFont, settings, settingsUi } from '$lib/settings.svelte';
+  import { fileIcon } from '$lib/fileicon';
   import { toast } from '$lib/toast.svelte';
   import { largeWindow } from '$lib/win';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -37,6 +38,7 @@
   } from '$lib/editor';
 
   const path = $derived(page.url.searchParams.get('path') ?? '');
+  const ficon = $derived(fileIcon(path));
 
   interface UndoEntry {
     id: number;
@@ -577,6 +579,7 @@
 <div class="merge" class:no-em={!showWords}>
   <header>
     <button onclick={() => goto('/conflicts')}>← Conflicts</button>
+    <span class="ficon" style="color:{ficon.color}">{@html ficon.svg}</span>
     <span class="title mono">{path}</span>
     <span class="tsep"></span>
     <button class="tb" title="Previous change" onclick={() => nav(-1)}>↑</button>
@@ -757,6 +760,12 @@
 
   .hbar::-webkit-scrollbar-thumb:hover {
     background-color: var(--d-dimmer);
+  }
+
+  .ficon {
+    display: inline-flex;
+    flex: none;
+    margin-right: -2px;
   }
 
   footer {
