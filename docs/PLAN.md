@@ -19,7 +19,7 @@
 **明确不做**
 
 - log / commit / push 等冲突流程之外的 git 客户端功能 (例外, 2026-07-11 Zero 定: 菜单顶栏分支 chip 可切换本地分支, 服务于操作发起, 不再外扩);
-- CLI 的 `file` 单文件模式; i18n 与亮色主题**仍未做**——全局仍是 IDEA New UI 暗色 + 大窗英文/小窗中文的文案分层, 语言与主题切换列为设置系统的后续候选("配置系统不做"于 2026-07-12 由 Zero 推翻, 轻量设置系统见 §3 命令表与 §10 决定);
+- CLI 的 `file` 单文件模式; 语言与主题已入设置(2026-07-12, "配置系统不做"同日由 Zero 推翻): 默认仍是暗色 + 分层文案(大窗英文/小窗中文), 可切亮色/全英文——**大窗 IDEA 英文原文不随语言切换**(1:1 还原基准是英文截图), 全中文大窗未做、如有需要另行定稿;
 - 键盘驱动的操作流 (仅保留 ⌘Z / ⌘⇧Z / ⌘⏎ / Esc 等常规编辑键)。
 
 ## 2. 架构: 计算在 Rust, 交互状态在前端
@@ -147,9 +147,9 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 
 拖文件夹开仓库 → 菜单点操作(对话框选分支/提交) → 出冲突自动进列表 → 双击行进三栏 → hover chunk 高亮且按钮浮现 → 点 ≫/≪/✕ 处理 → 点接缝色带/ruler 跳转 → 顶栏 ⋙ 一键清非冲突 → 底栏 Apply → 列表 Continue → 完成回菜单。全程零键盘。
 
-## 6. 主题 tokens (全局统一 IDEA New UI 暗色, 2026-07-10 定稿)
+## 6. 主题 tokens (IDEA New UI 双色系, 暗色默认; 2026-07-10 定稿, 2026-07-12 增亮色)
 
-`src/lib/theme.css` 集中 CSS 变量(--d-* 系列): 画布 `#1e1f22` · 面板 `#2b2d30` · 分隔线 `#393b40`/`#43454a` · 文本 `#dfe1e5` / 弱化 `#9da0a8` · IDEA 蓝 `#3574f0`(主按钮) · 选中 `#2e436e` · 绿 `#5fad65` · 红 `#e46962` · 琥珀 `#d9a343`("进行中"语义色, 如菜单状态栏) · **PINCER 橙 `#ff7a2f`(仅 logo / 活动 tab 下划线 / 终端光标)** + §5.2 四个 chunk 暗色。等宽字体 JetBrains Mono Regular (OFL 内嵌于 `static/fonts/`, 2026-07-11 落地), UI 字体系统栈。
+`src/lib/theme.css` 集中 CSS 变量(--d-* 系列), **暗色在 `:root`、亮色在 `html[data-theme='light']` 整体翻转**(设置系统写 data 属性), 页面禁止写死 hex——新颜色必须进 token 双套。暗色基调: 画布 `#1e1f22` · 面板 `#2b2d30` · 分隔线 `#393b40`/`#43454a` · 文本 `#dfe1e5` / 弱化 `#9da0a8` · IDEA 蓝 `#3574f0`(主按钮) · 选中 `#2e436e` · 绿 `#5fad65` · 红 `#e46962` · 琥珀 `#d9a343`("进行中"语义色) · **PINCER 橙 `#ff7a2f`(仅 logo / 活动 tab 下划线 / 终端光标, 两主题共用)** + §5.2 四个 chunk 色。亮色为 IDEA New UI Light 近似初值(白画布 `#ffffff` / 面板 `#f7f8fa` / 选中 `#d4e2ff` 等, M5 与暗色一并逐像素校准)。等宽字体 JetBrains Mono Regular (OFL 内嵌于 `static/fonts/`, 2026-07-11 落地), UI 字体系统栈。
 
 ## 7. 里程碑 (不含任何 git-pincer 仓库改动)
 
@@ -192,4 +192,4 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 - **终端缓冲**: `git://output` 前端 rAF 合帧批量落地, 缓冲上限 2000 条(超限整批丢最旧), 长会话 DOM 不无界增长;
 - **聚焦重探限频**: 800ms 冷却 + 进行中不叠加(菜单页与冲突列表页共同约定);
 - **生产加固**: 禁浏览器右键菜单(可编辑区/有选区除外, 选区保留原生 Copy)与刷新/打印快捷键(刷新丢会话状态); dev 构建不受限;
-- **设置系统**(2026-07-12 Zero 定, 推翻"配置系统不做"): 存 app-data `settings.json`(与 recent.json 同目录, 应用更新/重装保留); Rust `settings.rs` 类型化 `Settings`, **全字段 `#[serde(default)]`** = 跨版本兼容契约(旧文件缺字段落默认, 新版本删的字段被忽略, 永不因升级重置); 前端 `settings.svelte.ts` **即改即存**(无 OK/Cancel 暂存), 经 `--editor-font-size` / `--editor-font-family` CSS 变量生效(编辑器进 /merge 时新建取当次值, 不做热更新); 入口 = 菜单顶栏齿轮。首批四项: 编辑器字号(钳 8–32)/编辑器字体(空 = 内嵌 JetBrains Mono)/关窗行为(托盘|退出, lib.rs 关闭拦截读 `AppState::close_to_tray()`)/词级强调默认开关。主题(亮色)与语言(全中/全英)为骨架上的后续候选, 做前先在此定稿。
+- **设置系统**(2026-07-12 Zero 定, 推翻"配置系统不做"): 存 app-data `settings.json`(与 recent.json 同目录, 应用更新/重装保留); Rust `settings.rs` 类型化 `Settings`, **全字段 `#[serde(default)]`** = 跨版本兼容契约(旧文件缺字段落默认, 新版本删的字段被忽略, 永不因升级重置); 前端 `settings.svelte.ts` **即改即存**(无 OK/Cancel 暂存), 经 `--editor-font-size` / `--editor-font-family` CSS 变量生效(编辑器进 /merge 时新建取当次值, 不做热更新); 入口 = 菜单顶栏齿轮。首批四项: 编辑器字号(钳 8–32)/编辑器字体(空 = 内嵌 JetBrains Mono)/关窗行为(托盘|退出, lib.rs 关闭拦截读 `AppState::close_to_tray()`)/词级强调默认开关。**主题与语言**(2026-07-12 同日落地): `theme = dark|light`——亮色即 §6 的 Light tokens 整体翻转, CM6 出亮暗双主题+双语法配色(进 /merge 时按当次设置选用), 窗口原生主题/底色与托盘菜单文案由 Rust `apply_to_shell` 在 setup 与 set_settings 时同步; `language = zh|en`——**zh 保持分层设计(大窗 IDEA 英文原文 + 小窗中文辅助), en 为全英文**, 大窗原文不进词典; 词典在 `src/lib/i18n.ts`(纯模块, [zh,en] 词条, vitest 校验完整性), 响应式 `t()` 读语言设置, 切换后已挂载 UI 即时翻转无需重载。

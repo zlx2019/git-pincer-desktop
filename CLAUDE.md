@@ -71,12 +71,13 @@ git 二进制 (继承用户 credentials/hooks/rerere 配置)
 - **接管机制**: 无论操作在面板发起还是终端发起，窗口重获焦点会重探仓库状态，出现冲突即接管切大窗。例外是**搁置**（`session.parked`）：冲突页 Close 置位后回菜单小窗，/menu 守卫与聚焦重探都放行；恢复入口是菜单顶部的琥珀横幅（点击清搁置回 /conflicts），op 进行中五条指令与分支切换禁用；重探发现 op 已结束（外部完成/中止）时搁置自动失效。冲突现场无需持久化——全在 git 仓库里，恢复即重新推导。
 - **托盘驻留** (lib.rs, tauri `tray-icon` feature): 关闭窗口被 `on_window_event` 拦截为隐藏，应用驻留系统托盘（菜单"显示窗口/退出"；Windows/Linux 左键单击唤回，macOS 左键弹菜单、点 Dock 图标经 `RunEvent::Reopen` 唤回）。隐藏不销毁 webview，session 状态原样保留；真正退出走托盘菜单。托盘全在 Rust 侧，无需 capabilities 白名单。
 - **能力白名单**: 前端调用的窗口/插件 API 必须列入 `src-tauri/capabilities/default.json`（现有 core/dialog/opener + window 的 show/set-focus；窗口尺寸类操作已收进 Rust 命令，无需白名单），否则运行时被拒。
-- **设置系统**: Rust `settings.rs`——app-data `settings.json`，**全字段 `#[serde(default)]`** 保跨版本兼容；`set_settings` 归一化（字号钳 8–32、字体名清洗）后返回，前端以返回值回同步；关窗行为在 lib.rs 关闭拦截里读 `AppState::close_to_tray()`。前端 `src/lib/settings.svelte.ts` 即改即存，经 `--editor-font-size`/`--editor-font-family` CSS 变量生效（编辑器进 /merge 时新建取当次值，无需热更新）；对话框入口在菜单顶栏齿轮。**新增设置项三步**: settings.rs 加字段（含默认值与归一化）→ 镜像 api.ts `Settings` 与 `DEFAULT_SETTINGS` → SettingsDialog 加控件。
+- **设置系统**: Rust `settings.rs`——app-data `settings.json`，**全字段 `#[serde(default)]`** 保跨版本兼容；`set_settings` 归一化（字号钳 8–32、字体名清洗）后返回，前端以返回值回同步；关窗行为在 lib.rs 关闭拦截里读 `AppState::close_to_tray()`；主题/语言经 `commands::apply_to_shell`（setup 与 set_settings 共用）同步窗口原生主题、底色与托盘菜单文案。前端 `src/lib/settings.svelte.ts` 即改即存，经 `--editor-font-size`/`--editor-font-family` CSS 变量与 `data-theme` 属性生效（编辑器进 /merge 时新建取当次值，无需热更新）；对话框入口在菜单顶栏齿轮。**新增设置项三步**: settings.rs 加字段（含默认值与归一化）→ 镜像 api.ts `Settings` 与 `DEFAULT_SETTINGS` → SettingsDialog 加控件。
+- **主题与文案**: 亮色 = `html[data-theme='light']` 整体翻转 tokens，页面**禁止写死 hex**（新颜色进 theme.css 双套）；CM6 亮暗双主题/双语法配色在 editor.ts（`appearanceExtensions(light)`）。小窗/辅助文案走 `src/lib/i18n.ts` 词典（[zh, en] 词条，vitest 校验完整性）+ 响应式 `t()`（i18n.svelte.ts，语言切换即时生效）；**大窗 IDEA 英文原文不进词典**（1:1 还原基准），语言语义 = zh 分层（大窗英文/小窗中文）、en 全英。
 
 ## 约定
 
 - 工具链 1.96.0 锁定于 `rust-toolchain.toml`；edition 2024 与 rust-version 声明在 `src-tauri/Cargo.toml`。lint 已开 `unwrap_used` / `expect_used` / `panic` / `dbg_macro` / `missing_docs` / `unsafe_code` 警告，clippy CI 用 `-D warnings`——公共项必须写文档注释，禁用 `.unwrap()`（测试除外）。
 - 前端是纯 SPA：`ssr = false` + adapter-static（fallback index.html），**禁止** server load / `+server.ts` 等服务端能力；`src-tauri/**` 不在 vite watch 内（改 Rust 不触发前端 HMR）。
-- 主题 tokens 集中在 `src/lib/theme.css`（`--d-*` 变量，IDEA New UI 暗色）；PINCER 橙 `#ff7a2f` 仅用于 logo / 活动 tab 下划线 / 终端光标，不得挪作他用。
+- 主题 tokens 集中在 `src/lib/theme.css`（`--d-*` 变量：暗色在 `:root`，亮色在 `html[data-theme='light']` 整体翻转）；PINCER 橙 `#ff7a2f` 仅用于 logo / 活动 tab 下划线 / 终端光标（两主题共用），不得挪作他用。
 - 无 UI 组件库、无 JS diff 库：样式手写 CSS，diff 全在 Rust；CM6 共用基建（主题/高亮/装饰/同步滚动）在 `src/lib/editor.ts`，纯 chunk 逻辑（无视图依赖）在 `src/lib/chunks.ts`。合理需要的新依赖可直接引入，无需逐项报批（2026-07-11 Zero 定）——但上述两条架构决定（不引 UI 组件库/JS diff 库）仍然有效。
-- UI 文案：大窗（Conflicts/三栏）用 IDEA 英文原文；小窗（打开页/菜单）的辅助文案用中文（说明行、终端 tab、状态栏、✔/✘ 尾行）。
+- UI 文案：大窗（Conflicts/三栏）用 IDEA 英文原文（不随语言设置切换）；小窗（打开页/菜单）的辅助文案默认中文（说明行、终端 tab、状态栏、✔/✘ 尾行），语言设为 en 时经 i18n 词典切全英。
