@@ -281,15 +281,12 @@
           <path d="m4 6 4 4 4-4" />
         </svg>
       </button>
+      <!-- 换仓库 = 文件夹 + 内嵌左箭头(回打开页); 设置入口不放顶栏(2026-07-12 Zero 定),
+           走 ⌘(Ctrl)+, 与 macOS 应用菜单 -->
       <button class="iconbtn" title="Switch repository" onclick={() => goto('/')}>
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M1.5 4.5a1 1 0 0 1 1-1h3l1.5 1.8h6.5a1 1 0 0 1 1 1v1.2M3.5 13.5l1.6-5h9.9l-1.6 5z" />
-        </svg>
-      </button>
-      <button class="iconbtn gear" title={t('set-title')} onclick={() => (settingsUi.open = true)}>
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
-          <circle cx="8" cy="8" r="2.4" />
-          <path d="M8 1.6v2.1M8 12.3v2.1M1.6 8h2.1M12.3 8h2.1M3.5 3.5 5 5M11 11l1.5 1.5M12.5 3.5 11 5M5 11l-1.5 1.5" />
+          <path d="M14.5 12.2a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1h3l1.4 1.7h6.6a1 1 0 0 1 1 1z" />
+          <path d="M10.4 9.4H5.8M7.6 7.6 5.8 9.4l1.8 1.8" />
         </svg>
       </button>
     </div>
@@ -486,11 +483,6 @@
   .iconbtn:hover {
     background: var(--d-hover);
     color: var(--d-text);
-  }
-
-  /* 仅首个图标按钮吃右推 margin, 后续的贴排(topbar 的 gap 提供间距) */
-  .iconbtn + .iconbtn {
-    margin-left: 0;
   }
 
   /* ── 指令面板 ──────────────────────────── */
