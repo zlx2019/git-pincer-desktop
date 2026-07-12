@@ -50,14 +50,6 @@
 - **Windows**: SmartScreen 拦截时点 "更多信息 → 仍要运行"
 - **Linux**: AppImage 先 `chmod +x` 再运行
 
-## 30 秒上手
-
-```bash
-scripts/demo-repo.sh          # 在 /tmp/pincer-demo 造好一个带现成冲突的演示仓库
-```
-
-在应用里打开 `/tmp/pincer-demo`, 从面板发起 **合并分支 → feature/merge**——接管、冲突列表、
-三栏编辑一步到位。
 
 ## 开发
 

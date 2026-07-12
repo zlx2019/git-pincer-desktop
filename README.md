@@ -57,15 +57,6 @@ Current builds are **not code-signed**, so the first launch needs a manual bypas
 - **Windows**: when SmartScreen blocks, click "More info → Run anyway"
 - **Linux**: `chmod +x` the AppImage before running
 
-## Try it in 30 seconds
-
-```bash
-scripts/demo-repo.sh          # creates /tmp/pincer-demo with ready-made conflicts
-```
-
-Open `/tmp/pincer-demo` in the app and launch **Merge branch → feature/merge** from the
-palette — takeover, conflicts list and the three-pane editor are one step away.
-
 ## Develop
 
 ```bash
