@@ -78,7 +78,9 @@ Linux 包管理器与 Windows 安装器会展示这些字段, 现在只有 categ
 
 ## 2. P1 — 强烈建议 (你点名的都在这)
 
-### 2.1 托盘专用单色 template 图标 (macOS 菜单栏惯例)
+### 2.1 托盘专用单色 template 图标 (macOS 菜单栏惯例) — ✅ 完成 (2026-07-12)
+源 `assets/tray.svg` (与 icon.svg 同构型剪影, 线宽加粗), 产物 `src-tauri/icons/tray.png` (22pt@2x);
+macOS `icon_as_template(true)` 内嵌加载 (tauri 开 `image-png` feature), 其余平台保留彩色应用图标。
 现在托盘直接用彩色应用图标, 在 macOS 菜单栏里像个"外来户"。
 惯例是**单色剪影 + template 模式**, 随亮暗菜单栏自动反色:
 

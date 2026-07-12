@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 1024 1024">
+  <!-- PINCER 托盘图标(macOS template): 与 icon.svg 同构型的纯黑剪影,
+       系统随亮暗菜单栏/选中态自动反色; 线宽较应用图标加粗保证 22pt 下可辨 -->
+  <path d="M 404 240 Q 252 512 404 784" fill="none" stroke="#000" stroke-width="120" stroke-linecap="round"/>
+  <path d="M 620 240 Q 772 512 620 784" fill="none" stroke="#000" stroke-width="120" stroke-linecap="round"/>
+  <rect x="452" y="400" width="120" height="224" rx="32" fill="#000"/>
+</svg>

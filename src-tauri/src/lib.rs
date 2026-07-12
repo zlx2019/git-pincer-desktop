@@ -46,6 +46,14 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                 show_main_window(tray.app_handle());
             }
         });
+    // macOS 菜单栏惯例: 单色 template 剪影(源 assets/tray.svg), 系统随亮暗菜单栏
+    // 与选中态自动反色; 其余平台的托盘保留彩色应用图标
+    #[cfg(target_os = "macos")]
+    {
+        let tpl = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
+        tray = tray.icon(tpl).icon_as_template(true);
+    }
+    #[cfg(not(target_os = "macos"))]
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }
