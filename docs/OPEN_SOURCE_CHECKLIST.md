@@ -65,6 +65,7 @@ Linux 包管理器与 Windows 安装器会展示这些字段, 现在只有 categ
 社区标配三件套的最后一件 (Contributor Covenant 2.1 模板直接用, GitHub 社区检查项会亮绿)。
 
 ### 1.6 版本号三处同步的发布流程 — ✅ 完成 (2026-07-12, 写入 CONTRIBUTING 的 Release Process 节)
+后续强化(同日): Tauri.toml `version = "../package.json"` 继承权威源(3 处→2 处); `scripts/bump.sh <semver>` 一步完成改版本/同步 lock/重生成 CHANGELOG/提交/打 tag, 推送留人工。
 `package.json` / `src-tauri/Cargo.toml` / `src-tauri/Tauri.toml` 三处版本要一致。
 在 CONTRIBUTING 或 README 写死发布流程:
 

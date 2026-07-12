@@ -3,7 +3,8 @@
 # 字段参考: https://tauri.app/reference/config/
 
 product-name = "PINCER"
-version = "0.1.0"
+# 版本继承 package.json(唯一权威源), bump 时无需改这里
+version = "../package.json"
 identifier = "io.github.zlx2019.gitpincer"
 
 [build]
