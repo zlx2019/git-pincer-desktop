@@ -146,14 +146,19 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
-            // 关窗行为由设置决定: 收进托盘(默认, 会话状态原样保留)或直接退出;
-            // 无论走哪条路, 先把当前形态的窗口尺寸快照落盘(尺寸记忆的兜底采集点)
+            // 关窗行为由设置决定: 收进托盘(默认, 会话状态原样保留)或直接退出。
+            // 尺寸记忆的兜底采集点: 采集(纯内存)在隐藏前, 落盘挪到隐藏后——
+            // 磁盘延迟不垫在"点关闭→窗口消失"的手感里
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                commands::remember_win_size(window.app_handle());
-                let state = window.app_handle().state::<commands::AppState>();
+                let app = window.app_handle();
+                let snapshot = commands::remember_win_size(app);
+                let state = app.state::<commands::AppState>();
                 if state.close_to_tray() {
                     api.prevent_close();
                     let _ = window.hide();
+                }
+                if let Some(s) = snapshot {
+                    commands::persist_settings(app, &s);
                 }
             }
         })
@@ -168,8 +173,12 @@ pub fn run() {
     };
     app.run(|app, event| {
         match event {
-            // 退出请求(⌘Q/应用菜单/托盘退出都经此): 退出前快照当前形态窗口尺寸
-            tauri::RunEvent::ExitRequested { .. } => commands::remember_win_size(app),
+            // 退出请求(⌘Q/应用菜单/托盘退出都经此): 退出前快照当前形态窗口尺寸并落盘
+            tauri::RunEvent::ExitRequested { .. } => {
+                if let Some(s) = commands::remember_win_size(app) {
+                    commands::persist_settings(app, &s);
+                }
+            }
             // macOS: 窗口隐藏后点 Dock 图标重开
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Reopen { .. } => show_main_window(app),

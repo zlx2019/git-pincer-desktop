@@ -127,7 +127,7 @@ export type RoundOutcome =
   | { kind: 'nextRound'; files: FileRow[] }
   | { kind: 'failed'; message: string };
 
-/** continue 过程的一行输出 */
+/** continue 过程的一行输出(事件按批到达: Rust 侧 ≤25ms/≤64 行聚批降低 IPC 频次) */
 export interface OutputLine {
   stream: 'stdout' | 'stderr';
   line: string;
@@ -154,9 +154,9 @@ export const api = {
   switchBranch: (name: string) => invoke<void>('switch_branch', { name }),
   commits: (othersOnly: boolean, limit = 30) =>
     invoke<CommitInfo[]>('commits', { othersOnly, limit }),
-  /** 订阅 continue 的输出流 */
-  onOutput: (cb: (l: OutputLine) => void): Promise<UnlistenFn> =>
-    listen<OutputLine>('git://output', (e) => cb(e.payload)),
+  /** 订阅 launch/continue 的输出流(载荷 = 一批行) */
+  onOutput: (cb: (lines: OutputLine[]) => void): Promise<UnlistenFn> =>
+    listen<OutputLine[]>('git://output', (e) => cb(e.payload)),
   /** 订阅"打开设置"通知(macOS 应用菜单 设置… 触发) */
   onOpenSettings: (cb: () => void): Promise<UnlistenFn> => listen('app://open-settings', cb),
 };

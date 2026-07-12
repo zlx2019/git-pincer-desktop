@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { goto, preloadCode } from '$app/navigation';
   import { getCurrentWindow } from '@tauri-apps/api/window';
-  import { api, type LaunchKind, type OutputLine } from '$lib/api';
+  import { api, type LaunchKind } from '$lib/api';
   import { rafBatcher } from '$lib/batch';
   import { t } from '$lib/i18n.svelte';
   import { pushTerm, session, term, type TermEntry } from '$lib/state.svelte';
@@ -216,9 +216,11 @@
     const started = Date.now();
     // 大输出(如冗长 pull)逐行入 $state 会逐行重排; 合帧后每帧一次批量落地
     const batch = rafBatcher<TermEntry>((b) => pushTerm(...b));
-    const unlisten = await api.onOutput((l: OutputLine) =>
-      batch.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line })
-    );
+    const unlisten = await api.onOutput((lines) => {
+      for (const l of lines) {
+        batch.push({ kind: l.stream === 'stderr' ? 'err' : 'out', text: l.line });
+      }
+    });
     try {
       const outcome = await api.launchOp(kind, targets);
       batch.drain();
@@ -352,7 +354,7 @@
             </button>
           </div>
           <div class="tlog mono" bind:this={termEl}>
-            {#each term.entries as en, i (i)}
+            {#each term.entries as en (en.id)}
               {#if en.kind === 'cmd'}
                 <span class="ln"><span class="pr">➜</span> <span class="cmd">{en.text}</span></span>
               {:else}
