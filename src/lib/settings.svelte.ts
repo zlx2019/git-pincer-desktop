@@ -13,6 +13,9 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'zh',
 };
 
+/** 内嵌等宽字体(随应用分发, 见 theme.css @font-face; 首项为默认, 存储值 '' 表示它) */
+export const EMBEDDED_FONTS = ['JetBrains Mono', 'Maple Mono'] as const;
+
 /** 全局设置状态(所有页面共享) */
 export const settings = $state({ value: { ...DEFAULT_SETTINGS } });
 
@@ -47,6 +50,18 @@ export async function updateSettings(patch: Partial<Settings>) {
     }
   } catch {
     // 见函数注释
+  }
+}
+
+/** 编辑器字体就位保障(进 /merge 建编辑器前 await):
+    CM6 创建时测量字符宽度, 内嵌字体(如 Maple Mono)后到会导致度量错位;
+    系统字体/未知字体名无对应 @font-face, load() 立即空解析, 不会卡住 */
+export async function ensureEditorFont() {
+  const fam = settings.value.editorFontFamily.trim() || EMBEDDED_FONTS[0];
+  try {
+    await document.fonts.load(`12px "${fam}"`);
+  } catch {
+    // 字体名非法等异常: 按就绪处理, 编辑器走回落字体
   }
 }
 

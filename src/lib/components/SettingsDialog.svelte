@@ -2,7 +2,7 @@
   // 设置对话框(菜单小窗入口, 文案随语言设置): 即改即存——每项落定立即生效并持久化,
   // 无 OK/Cancel 暂存语义; "完成"只是关闭
   import { t } from '$lib/i18n.svelte';
-  import { DEFAULT_SETTINGS, settings, updateSettings } from '$lib/settings.svelte';
+  import { DEFAULT_SETTINGS, EMBEDDED_FONTS, settings, updateSettings } from '$lib/settings.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
 
@@ -10,6 +10,30 @@
   function commitSize(e: Event) {
     const v = Number((e.currentTarget as HTMLInputElement).value);
     if (Number.isFinite(v)) updateSettings({ editorFontSize: Math.round(v) });
+  }
+
+  /** 当前存储值是否自定义字体(非空且不在内嵌清单; '' = 默认 JetBrains Mono) */
+  function isCustomFamily(f: string): boolean {
+    const fam = f.trim();
+    return fam !== '' && !EMBEDDED_FONTS.includes(fam as (typeof EMBEDDED_FONTS)[number]);
+  }
+
+  // 选中"自定义…"但尚未输入时输入框也要保持展开, 不能只从存储值推导
+  let customFont = $state(isCustomFamily(settings.value.editorFontFamily));
+  const fontChoice = $derived(
+    customFont || isCustomFamily(settings.value.editorFontFamily)
+      ? '__custom'
+      : settings.value.editorFontFamily.trim()
+  );
+
+  function pickFamily(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value;
+    if (v === '__custom') {
+      customFont = true;
+      return;
+    }
+    customFont = false;
+    updateSettings({ editorFontFamily: v });
   }
 
   function commitFamily(e: Event) {
@@ -68,14 +92,31 @@
 
       <label class="row">
         <span class="lbl">{t('set-font-family')}</span>
-        <input
-          class="txt mono"
-          type="text"
-          placeholder={t('set-font-ph')}
-          value={settings.value.editorFontFamily}
-          onchange={commitFamily}
-        />
+        <span class="selwrap">
+          <select class="txt sel" value={fontChoice} onchange={pickFamily}>
+            <option value="">{t('set-font-emb', EMBEDDED_FONTS[0])}</option>
+            {#each EMBEDDED_FONTS.slice(1) as f (f)}
+              <option value={f}>{t('set-font-emb', f)}</option>
+            {/each}
+            <option value="__custom">{t('set-font-custom')}</option>
+          </select>
+        </span>
       </label>
+
+      {#if fontChoice === '__custom'}
+        <label class="row">
+          <span class="lbl"></span>
+          <input
+            class="txt mono"
+            type="text"
+            placeholder={t('set-font-ph')}
+            value={isCustomFamily(settings.value.editorFontFamily)
+              ? settings.value.editorFontFamily
+              : ''}
+            onchange={commitFamily}
+          />
+        </label>
+      {/if}
 
       <div class="row">
         <span class="lbl">{t('set-close')}</span>
@@ -103,7 +144,12 @@
     </div>
     <p class="note dim">{t('set-editor-note')}</p>
     <footer>
-      <button onclick={() => updateSettings({ ...DEFAULT_SETTINGS })}>{t('set-reset')}</button>
+      <button
+        onclick={() => {
+          customFont = false;
+          updateSettings({ ...DEFAULT_SETTINGS });
+        }}>{t('set-reset')}</button
+      >
       <span class="hint dim">{t('set-hint')}</span>
       <span class="spacer"></span>
       <button class="primary" onclick={onclose}>{t('set-done')}</button>
@@ -187,6 +233,31 @@
 
   .txt {
     width: 168px;
+  }
+
+  /* 字体下拉: 去掉原生外观自绘箭头, 与 .txt 输入框同一视觉 */
+  .selwrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .sel {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 168px;
+    padding-right: 22px;
+  }
+
+  .selwrap::after {
+    content: '';
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    margin-top: -2px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--d-dim);
+    pointer-events: none;
   }
 
   .num:focus-visible,

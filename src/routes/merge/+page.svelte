@@ -20,7 +20,7 @@
     type ChunkState,
   } from '$lib/chunks';
   import { session } from '$lib/state.svelte';
-  import { settings, settingsUi } from '$lib/settings.svelte';
+  import { ensureEditorFont, settings, settingsUi } from '$lib/settings.svelte';
   import { toast } from '$lib/toast.svelte';
   import { largeWindow } from '$lib/win';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -196,8 +196,13 @@
   /** 拉取快照并构建三栏 */
   async function load() {
     try {
-      // 快照(Rust 引擎)与语言包(动态 import)无依赖, 并行拉取
-      const [s, lang] = await Promise.all([api.openMerge(path), languageFor(path)]);
+      // 快照(Rust 引擎)/语言包(动态 import)/编辑器字体(fonts.load)互无依赖, 并行就绪;
+      // 字体必须先于 CM6 创建到位, 否则首次字符宽度测量会按回落字体算
+      const [s, lang] = await Promise.all([
+        api.openMerge(path),
+        languageFor(path),
+        ensureEditorFont(),
+      ]);
       snap = s;
       leftLines = s.left.split('\n');
       rightLines = s.right.split('\n');

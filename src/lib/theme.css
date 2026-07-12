@@ -2,13 +2,31 @@
    三层灰 #1e1f22 画布 / #2b2d30 面板 / #393b40 分隔线;
    PINCER 橙只出现在 logo / 活动 tab 下划线 / 终端光标三处 */
 
-/* JetBrains Mono 内嵌(OFL 1.1, 许可证见 static/fonts/OFL.txt):
-   跨平台等宽度量一致, 未装该字体的机器不再回落到 Menlo/Consolas */
+/* 内嵌等宽字体(均 OFL 1.1, 许可证见 static/fonts/OFL-*.txt):
+   跨平台等宽度量一致, 未装字体的机器不再回落到 Menlo/Consolas。
+   JetBrains Mono 是默认(app.html 预载); Maple Mono 按需加载——
+   仅当设置选中时由 ensureEditorFont() 在进三栏前拉取 */
 @font-face {
   font-family: "JetBrains Mono";
   src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Maple Mono";
+  src: url("/fonts/MapleMono-Regular.ttf.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Maple Mono";
+  src: url("/fonts/MapleMono-Italic.ttf.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
   font-display: block;
 }
 
