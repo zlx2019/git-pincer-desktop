@@ -1,6 +1,6 @@
 [package]
 name = "git-pincer-desktop"
-version = "0.1.0-rc.1"
+version = "0.1.0"
 description = "IDEA-style three-pane Git conflict resolver — desktop app for git-pincer"
 authors = ["Zero <zero9501@outlook.com>"]
 edition = "2024"
