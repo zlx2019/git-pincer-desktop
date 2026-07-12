@@ -19,7 +19,7 @@
 **明确不做**
 
 - log / commit / push 等冲突流程之外的 git 客户端功能 (例外, 2026-07-11 Zero 定: 菜单顶栏分支 chip 可切换本地分支, 服务于操作发起, 不再外扩);
-- CLI 的 `file` 单文件模式、i18n、配置系统 (硬编码全局 IDEA New UI **暗色**主题; 大窗文案用 IDEA 英文原文, 小窗辅助文案中文);
+- CLI 的 `file` 单文件模式; i18n 与亮色主题**仍未做**——全局仍是 IDEA New UI 暗色 + 大窗英文/小窗中文的文案分层, 语言与主题切换列为设置系统的后续候选("配置系统不做"于 2026-07-12 由 Zero 推翻, 轻量设置系统见 §3 命令表与 §10 决定);
 - 键盘驱动的操作流 (仅保留 ⌘Z / ⌘⇧Z / ⌘⏎ / Esc 等常规编辑键)。
 
 ## 2. 架构: 计算在 Rust, 交互状态在前端
@@ -62,6 +62,8 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 | `branches() → Branch[]` | 本地分支(带当前标记), merge/rebase 对话框数据 |
 | `commits(others_only, limit) → CommitInfo[]` | 最近提交; others_only 只列当前分支未包含的(cherry-pick 场景) |
 | `set_window_form(form)` | 窗口形态(compact/large): 最小尺寸/尺寸/居中单 IPC 完成; AppState 缓存已应用形态, 未变直接跳过 |
+| `get_settings() → Settings` | 用户设置(启动时 setup 从 app-data/settings.json 载入内存) |
+| `set_settings(settings) → Settings` | 归一化(字号钳 8–32, 字体名清洗) → 内存 → 落盘; 返回归一化结果供前端回同步 |
 
 事件只有一个: `git://output {stream, line}` (launch/continue 的输出流, 发起前订阅、结束即退订)。
 结局不走事件——launch/continue 的结果由命令返回值带回 (`LaunchOutcome` / `RoundOutcome`, `tag="kind"` 的 tagged union); 旧方案的 `git://round` / `git://done` 未实现也不再计划。
@@ -189,4 +191,5 @@ chunk 着色 (布局按参考图 1:1, 配色按 **IDEA Dark diff** 初值, M5 �
 - **构建 profile**(2026-07-12 定): dev 下依赖统一 O2(similar 热循环走优化码路, `pnpm tauri dev` 体验≈release; 首次构建慢一次, 本 crate 保持 O0 快增量), release 用完整 LTO + codegen-units=1 + opt-level=3 + strip + `panic = "abort"`(Zero 拍板, 换免展开表的更小更快二进制)。代价要清楚: release 下 spawn_blocking 里的意外 panic 会直接终止应用而不是落成前端 toast——dev 仍是展开, 崩溃排查用 dev 复现; clippy 的 `panic/unwrap_used` 告警把 panic 面压到最低是这个选择的前提;
 - **终端缓冲**: `git://output` 前端 rAF 合帧批量落地, 缓冲上限 2000 条(超限整批丢最旧), 长会话 DOM 不无界增长;
 - **聚焦重探限频**: 800ms 冷却 + 进行中不叠加(菜单页与冲突列表页共同约定);
-- **生产加固**: 禁浏览器右键菜单(可编辑区/有选区除外, 选区保留原生 Copy)与刷新/打印快捷键(刷新丢会话状态); dev 构建不受限。
+- **生产加固**: 禁浏览器右键菜单(可编辑区/有选区除外, 选区保留原生 Copy)与刷新/打印快捷键(刷新丢会话状态); dev 构建不受限;
+- **设置系统**(2026-07-12 Zero 定, 推翻"配置系统不做"): 存 app-data `settings.json`(与 recent.json 同目录, 应用更新/重装保留); Rust `settings.rs` 类型化 `Settings`, **全字段 `#[serde(default)]`** = 跨版本兼容契约(旧文件缺字段落默认, 新版本删的字段被忽略, 永不因升级重置); 前端 `settings.svelte.ts` **即改即存**(无 OK/Cancel 暂存), 经 `--editor-font-size` / `--editor-font-family` CSS 变量生效(编辑器进 /merge 时新建取当次值, 不做热更新); 入口 = 菜单顶栏齿轮。首批四项: 编辑器字号(钳 8–32)/编辑器字体(空 = 内嵌 JetBrains Mono)/关窗行为(托盘|退出, lib.rs 关闭拦截读 `AppState::close_to_tray()`)/词级强调默认开关。主题(亮色)与语言(全中/全英)为骨架上的后续候选, 做前先在此定稿。
