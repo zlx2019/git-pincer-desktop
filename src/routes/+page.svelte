@@ -71,8 +71,39 @@
 
 <main class="win">
   <div class="hero">
+    <!-- v2 logo 图形(几何同 assets/icon.svg): 挖空处用页面底色 token, 亮暗主题自适应 -->
+    <svg class="mark" viewBox="146 146 732 732" width="72" height="72" aria-hidden="true">
+      <g stroke="var(--d-orange)" stroke-width="56" stroke-linecap="round">
+        <line x1="512" y1="236" x2="512" y2="194" />
+        <line x1="617.6" y1="257" x2="633.7" y2="218.2" />
+        <line x1="707.2" y1="316.8" x2="736.9" y2="287.1" />
+        <line x1="767" y1="406.4" x2="805.8" y2="390.3" />
+        <line x1="788" y1="512" x2="830" y2="512" />
+        <line x1="767" y1="617.6" x2="805.8" y2="633.7" />
+        <line x1="707.2" y1="707.2" x2="736.9" y2="736.9" />
+        <line x1="617.6" y1="767" x2="633.7" y2="805.8" />
+        <line x1="512" y1="788" x2="512" y2="830" />
+        <line x1="406.4" y1="767" x2="390.3" y2="805.8" />
+        <line x1="316.8" y1="707.2" x2="287.1" y2="736.9" />
+        <line x1="257" y1="617.6" x2="218.2" y2="633.7" />
+        <line x1="236" y1="512" x2="194" y2="512" />
+        <line x1="257" y1="406.4" x2="218.2" y2="390.3" />
+        <line x1="316.8" y1="316.8" x2="287.1" y2="287.1" />
+        <line x1="406.4" y1="257" x2="390.3" y2="218.2" />
+      </g>
+      <circle cx="512" cy="512" r="300" fill="var(--d-orange)" />
+      <g stroke="var(--d-canvas)" stroke-width="30" stroke-linecap="round">
+        <line x1="414" y1="660" x2="512" y2="548" />
+        <line x1="610" y1="660" x2="512" y2="548" />
+        <line x1="512" y1="548" x2="512" y2="352" />
+      </g>
+      <circle cx="414" cy="660" r="32" fill="var(--d-canvas)" />
+      <circle cx="610" cy="660" r="32" fill="var(--d-canvas)" />
+      <circle cx="512" cy="352" r="40" fill="var(--d-canvas)" />
+      <circle cx="512" cy="548" r="52" fill="var(--d-canvas)" />
+      <circle cx="512" cy="548" r="22" fill="var(--d-orange)" />
+    </svg>
     <h1 class="logo mono">PINCER</h1>
-    <p class="tagline">IDEA-style Git conflict resolver</p>
     <button class="primary" disabled={opening} onclick={pickAndOpen}>Open Repository…</button>
   </div>
 
@@ -111,7 +142,7 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    margin-top: 96px;
+    margin-top: 76px;
   }
 
   .logo {
@@ -119,13 +150,7 @@
     font-size: 26px;
     font-weight: 500;
     letter-spacing: 5px;
-    margin: 0;
-  }
-
-  .tagline {
-    color: var(--d-dim);
-    font-size: 12px;
-    margin: 0 0 14px;
+    margin: 0 0 12px;
   }
 
   .primary {
