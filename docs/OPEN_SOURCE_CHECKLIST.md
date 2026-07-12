@@ -7,7 +7,7 @@
 
 | 类别 | 已有 |
 |---|---|
-| 法务 | `LICENSE` (MIT) · 字体 OFL 许可证随附 (`static/fonts/OFL.txt`) |
+| 法务 | `LICENSE` (MIT) · 字体 OFL 许可证随附 (`static/fonts/OFL-*.txt`, JetBrains Mono + Maple Mono) |
 | 社区 | `CONTRIBUTING.md` · `SECURITY.md` · issue 模板 ×2 · PR 模板 · dependabot |
 | 工程 | CI (fmt/clippy/nextest/doc/deny/typos/svelte-check/vitest/build) · release.yml 四平台矩阵 · git-cliff · pre-commit · `.editorconfig` · `rust-toolchain.toml` |
 | 品牌 | 应用图标全尺寸 (源 `assets/icon.svg`, PINCER 钳臂+diff 块) · favicon 已换品牌图 |
@@ -17,7 +17,9 @@
 
 ## 1. P0 — 首个正式 Release 前必须补齐
 
-### 1.1 README 门面三件套: 截图 / 徽章 / 安装说明
+### 1.1 README 门面三件套: 截图 / 徽章 / 安装说明 — 🔶 部分完成 (2026-07-12)
+✅ 徽章 (CI/Release/License/平台) · 安装节 (Releases 链接 + 平台产物表) · 过时修正 (pnpm test / rpm) 已落 README;
+⏳ **截图与主流程 GIF 待 Zero 出素材** (README 里留了 TODO 注释位)。
 桌面应用的 README 没有截图 = 没有转化率, 这是当前最大的缺口。
 
 - **截图**: 至少 2 张 (菜单小窗 + 三栏合并大窗), 存 `assets/screenshots/`;
@@ -29,13 +31,15 @@
   并附 **未签名产物的放行说明** (见 1.3)。
 - 顺手修两处过时: 检查节缺 `pnpm test`; 打包产物列表缺 rpm。
 
-### 1.2 CHANGELOG.md 落库
+### 1.2 CHANGELOG.md 落库 — ✅ 完成 (2026-07-12)
+`git cliff -o CHANGELOG.md` 已入库; 发版时按 CONTRIBUTING 的 Release Process 用 `git cliff --tag` 重新生成。
 cliff 目前只在打 tag 时生成 release notes, 仓库里没有可浏览的历史。
 
 - `git cliff -o CHANGELOG.md` 一次性生成, 提交入库;
 - release.yml 加一步在发版时重新生成并随版本提交 (或发版前手动跑), 保证与 tag 同步。
 
-### 1.3 未签名分发的用户文档 (macOS Gatekeeper / Windows SmartScreen)
+### 1.3 未签名分发的用户文档 (macOS Gatekeeper / Windows SmartScreen) — 🔶 README 部分完成 (2026-07-12)
+✅ 放行说明已写进 README 安装节; ⏳ 签名/公证待 Zero 的开发者账号。
 没有付费开发者账号前, 下载的 dmg 会提示"已损坏/无法验证开发者", exe 会被 SmartScreen 拦。
 这不是 bug, 但**必须写出来**, 否则第一批用户直接流失:
 
@@ -44,7 +48,8 @@ cliff 目前只在打 tag 时生成 release notes, 仓库里没有可浏览的�
 - 长期项: Apple Developer ID 签名 + 公证 (release.yml 已是矩阵, 加签名步骤即可, 需账号与证书 secrets),
   Windows 代码签名证书 (成本更高, 可后置)。
 
-### 1.4 bundle 元数据补全 (`src-tauri/Tauri.toml`)
+### 1.4 bundle 元数据补全 (`src-tauri/Tauri.toml`) — ✅ 完成 (2026-07-12)
+publisher / copyright / homepage / license / license-file 已进 `[bundle]`。
 Linux 包管理器与 Windows 安装器会展示这些字段, 现在只有 category:
 
 ```jsonc
@@ -56,10 +61,10 @@ Linux 包管理器与 Windows 安装器会展示这些字段, 现在只有 categ
 }
 ```
 
-### 1.5 CODE_OF_CONDUCT.md
+### 1.5 CODE_OF_CONDUCT.md — ✅ 完成 (2026-07-12, Contributor Covenant 2.1, 联系邮箱 = git 身份邮箱)
 社区标配三件套的最后一件 (Contributor Covenant 2.1 模板直接用, GitHub 社区检查项会亮绿)。
 
-### 1.6 版本号三处同步的发布流程
+### 1.6 版本号三处同步的发布流程 — ✅ 完成 (2026-07-12, 写入 CONTRIBUTING 的 Release Process 节)
 `package.json` / `src-tauri/Cargo.toml` / `src-tauri/Tauri.toml` 三处版本要一致。
 在 CONTRIBUTING 或 README 写死发布流程:
 
@@ -117,7 +122,7 @@ Tauri/Rust 社区受众大半英文。推荐 `README.md` 英文为主 (国际默
 | 产品显示名 | `productName` 目前是 `git-pincer-desktop`, .app/菜单栏就叫这个; 若想显示 "PINCER" 需改 productName (影响产物文件名, 发布前定, 之后别动) |
 | issue 表单化 | `.github/ISSUE_TEMPLATE/*.md` 升级为 `.yml` 表单 (必填项/下拉选平台版本), 提质 bug 报告 |
 | FUNDING.yml | 想接受赞助就加 (GitHub Sponsors / 爱发电), 不想就跳过 |
-| 隐私一句话 | README 写明 "不联网、无遥测、git 凭据走你本机配置"——桌面工具的信任加分项 |
+| 隐私一句话 | ✅ (2026-07-12) README 已写明 "不联网、无遥测、git 凭据走你本机配置" |
 | 性能/体积卖点 | README 放硬数字: .app 5.1MB、启动 <1s、纯 Rust diff 引擎——对比 Electron 类是差异化卖点 |
 | FAQ | "为什么只做冲突流程不做 git 客户端" (定位)、"和 IDEA 内置合并的关系"、Gatekeeper 放行、Linux 依赖 (webkit2gtk) |
 | 演示仓库 | README 里 playground 依赖姊妹仓库源码; 提供一个 `scripts/demo-repo.sh` 直接造演示冲突, 降低尝鲜门槛 |
