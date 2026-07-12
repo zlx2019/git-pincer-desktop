@@ -89,7 +89,7 @@ macOS `icon_as_template(true)` 内嵌加载 (tauri 开 `image-png` feature), 其
 - 源文件放 `assets/tray.svg`, 与 icon.svg 同风格。
 
 ### 2.2 冲突列表按文件类型出图标 (对齐 IDEA) — ✅ 完成 (2026-07-12)
-`src/lib/fileicon.ts`: 扩展名 → 字母徽章/图形 SVG + 既有 token 低饱和品类色 (rs/ts/js/svelte/vue/json/toml/yaml/lock/md/txt/html/xml/css/py/go/java/kt/c/cpp/sh + 图片类), 未知与二进制回落通用文档图标; 冲突列表与三栏 header 共用, vitest 覆盖映射。
+`src/lib/fileicon.ts`: 扩展名 → **Atom file-icons 官方 glyph 子集**(2026-07-12 Zero 定, 19 枚内嵌自 github.com/file-icons 的 icons(ISC)/MFixx(MIT)/DevOpicons(MIT) SVG 源, 零运行时依赖) + 既有 token 低饱和品类色; .git* 元文件按名识别; 无 glyph 的类型回落字母徽章, 再兜底通用文档图标; 冲突列表与三栏 header 共用, vitest 覆盖映射。
 现在所有文件共用一枚通用文档图标 (`conflicts/+page.svelte` 的 `.ficon`)。
 IDEA 的列表是按类型着色图标, 辨识度高很多。做法 (不违反"无 UI 组件库"约定):
 
