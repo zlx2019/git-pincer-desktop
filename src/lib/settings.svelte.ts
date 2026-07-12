@@ -9,6 +9,8 @@ export const DEFAULT_SETTINGS: Settings = {
   editorFontFamily: '',
   closeBehavior: 'tray',
   highlightWords: true,
+  theme: 'dark',
+  language: 'zh',
 };
 
 /** 全局设置状态(所有页面共享) */
@@ -45,11 +47,13 @@ export async function updateSettings(patch: Partial<Settings>) {
   }
 }
 
-/** 设置 → CSS 变量; 只覆盖编辑器专用变量, 不动全局 --font-mono(logo/终端等不受影响) */
+/** 设置 → DOM: 编辑器 CSS 变量(不动全局 --font-mono, logo/终端不受影响)
+    + 主题 data 属性(theme.css 的 html[data-theme=light] 整体翻转 tokens) */
 function applyToDom() {
   const st = document.documentElement.style;
   st.setProperty('--editor-font-size', `${settings.value.editorFontSize}px`);
   const fam = settings.value.editorFontFamily.trim();
   if (fam) st.setProperty('--editor-font-family', `"${fam}", var(--font-mono)`);
   else st.removeProperty('--editor-font-family');
+  document.documentElement.dataset.theme = settings.value.theme;
 }

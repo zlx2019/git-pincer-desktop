@@ -41,11 +41,60 @@
   --d-orange: #ff7a2f;
   --d-term: #1a1b1e;
 
+  /* 次级 tokens(原先散落各页的写死色, 收编后亮色主题才能整体翻转) */
+  --d-gutter: #6e7178; /* CM6 行号 */
+  --d-sel-dim: #243252; /* 弱选中底(工具栏 on 态 / kbd hover / 分段按钮) */
+  --d-sel-dim-border: #3a4c74;
+  --d-desc: #9db4d8; /* 菜单行 hover 描述文字 */
+  --d-table: #26282b; /* 冲突列表表体底 */
+  --d-term-border: #121316; /* 控制台描边 */
+
   /* 三栏 chunk 底色(IDEA Dark diff 初值, M5 逐像素校准) */
   --chunk-added: #294436;
   --chunk-modified: #385570;
   --chunk-deleted: #3f4145;
   --chunk-conflict: #45302b;
+  --chunk-done: rgba(255, 255, 255, 0.045); /* 已处理块降饱和 */
+  --chunk-em: rgba(255, 255, 255, 0.16); /* 词级强调 */
+  --ck-cur-outline: rgba(138, 180, 255, 0.55); /* 当前 chunk 描边 */
+}
+
+/* IDEA New UI 亮色(settings 切换, settings.svelte.ts 写 data-theme; 初值, M5 校准) */
+html[data-theme='light'] {
+  color-scheme: light;
+
+  --d-canvas: #ffffff;
+  --d-panel: #f7f8fa;
+  --d-border: #ebecf0;
+  --d-border-strong: #d3d5db;
+  --d-hover: #eef0f3;
+  --d-text: #1d1e22;
+  --d-dim: #6c707e;
+  --d-dimmer: #818594;
+  --d-blue: #3574f0;
+  --d-blue-lt: #2e55a3;
+  --d-sel: #d4e2ff;
+  --d-sel-text: #16407c;
+  --d-green: #1f8038;
+  --d-red: #cc3645;
+  --d-amber: #a46a1f;
+  --d-orange: #ff7a2f;
+  --d-term: #f7f8fa;
+
+  --d-gutter: #a8abb3;
+  --d-sel-dim: #e3ecff;
+  --d-sel-dim-border: #a8c4f0;
+  --d-desc: #44608f;
+  --d-table: #ffffff;
+  --d-term-border: #e3e4e8;
+
+  --chunk-added: #d8f0dc;
+  --chunk-modified: #d5e4ff;
+  --chunk-deleted: #e8e9eb;
+  --chunk-conflict: #ffdcd2;
+  --chunk-done: rgba(0, 0, 0, 0.05);
+  --chunk-em: rgba(0, 0, 0, 0.12);
+  --ck-cur-outline: rgba(53, 116, 240, 0.6);
 }
 
 * {
@@ -128,7 +177,7 @@ input[type="checkbox"] {
   line-height: 1.55;
   background: var(--d-term);
   color: var(--d-text);
-  border: 1px solid #121316;
+  border: 1px solid var(--d-term-border);
   border-radius: 8px;
   -webkit-user-select: text;
   user-select: text;

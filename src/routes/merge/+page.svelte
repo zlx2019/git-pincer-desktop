@@ -7,7 +7,6 @@
   import { Annotation, Compartment, Transaction, type Extension } from '@codemirror/state';
   import { EditorView, gutterLineClass, keymap, lineNumbers } from '@codemirror/view';
   import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
-  import { syntaxHighlighting } from '@codemirror/language';
   import { api, type MergeChunk, type MergeSnapshot } from '$lib/api';
   import {
     applyAllTargets,
@@ -26,10 +25,9 @@
   import { largeWindow } from '$lib/win';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import {
+    appearanceExtensions,
     buildPaneDecos,
     createPane,
-    ideaHighlight,
-    ideaTheme,
     languageFor,
     lineRangeToPos,
     linkScroll,
@@ -208,13 +206,19 @@
       await new Promise((r) => requestAnimationFrame(r));
       if (!leftEl || !resultEl || !rightEl) return;
 
-      const left = createPane(leftEl, s.left, [...readonlyExtensions(lang), geoTick, leftComp.of([])]);
+      // 编辑器随路由进入新建, 亮暗按当次设置选用(改主题后重进三栏生效)
+      const light = settings.value.theme === 'light';
+      const left = createPane(leftEl, s.left, [
+        ...readonlyExtensions(lang, light),
+        geoTick,
+        leftComp.of([]),
+      ]);
       const right = createPane(rightEl, s.right, [
-        ...readonlyExtensions(lang),
+        ...readonlyExtensions(lang, light),
         geoTick,
         rightComp.of([]),
       ]);
-      const result = createPane(resultEl, s.result, centerExtensions(lang));
+      const result = createPane(resultEl, s.result, centerExtensions(lang, light));
       views = [left, result, right];
       resultRanges = s.chunks.map((c) => lineRangeToPos(result.state.doc, c.resultRange));
       unlink = linkScroll([
@@ -232,13 +236,12 @@
   }
 
   /** 中栏扩展: 可编辑 + 历史 + 变更监听 */
-  function centerExtensions(lang: Extension): Extension[] {
+  function centerExtensions(lang: Extension, light: boolean): Extension[] {
     return [
       lineNumbers(),
       history(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      ideaTheme,
-      syntaxHighlighting(ideaHighlight, { fallback: true }),
+      ...appearanceExtensions(light),
       lang,
       geoTick,
       centerComp.of([]),
@@ -716,8 +719,8 @@
   }
 
   .tb.on {
-    background: #243252;
-    border-color: #3a4c74;
+    background: var(--d-sel-dim);
+    border-color: var(--d-sel-dim-border);
     color: var(--d-sel-text);
   }
 
@@ -805,7 +808,7 @@
   }
 
   .bandp.done {
-    fill: rgba(255, 255, 255, 0.045);
+    fill: var(--chunk-done);
   }
 
   .gbtns {
@@ -878,16 +881,16 @@
   }
 
   :global(.ck-done) {
-    background: rgba(255, 255, 255, 0.045);
+    background: var(--chunk-done);
   }
 
   :global(.ck-cur) {
-    outline: 1px solid rgba(138, 180, 255, 0.55);
+    outline: 1px solid var(--ck-cur-outline);
     outline-offset: -1px;
   }
 
   :global(.ck-em) {
-    background: rgba(255, 255, 255, 0.16);
+    background: var(--chunk-em);
     border-radius: 2px;
   }
 </style>

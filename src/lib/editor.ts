@@ -17,38 +17,42 @@ import { lineRangeToPos, paneRange, type Pane } from './chunks';
 // 纯几何/区间逻辑在 chunks.ts(可 node 单测), 此处转出保持既有导入路径
 export { lineRangeToPos, paneRange, type Pane };
 
-/** IDEA New UI Dark 编辑器外观 */
-export const ideaTheme = EditorView.theme(
-  {
-    '&': {
-      backgroundColor: 'var(--d-canvas)',
-      color: 'var(--d-text)',
-      height: '100%',
-      // 字号/字体走设置系统的可覆盖变量(进入 /merge 时编辑器新建, 取当次值)
-      fontSize: 'var(--editor-font-size, 12px)',
-    },
-    '.cm-scroller': {
-      fontFamily: 'var(--editor-font-family, var(--font-mono))',
-      lineHeight: '1.6',
-      overflow: 'auto',
-      // 三栏同步滚动, 原生滚动条只剩噪音: 全部隐藏, 导航交给滚轮与 overview ruler
-      scrollbarWidth: 'none',
-    },
-    '.cm-scroller::-webkit-scrollbar': { display: 'none' },
-    // 行号槽不设竖分隔线: chunk 行的槽位与内容同色(gutterLineClass), 色带得以穿过行号列(IDEA 行为)
-    '.cm-gutters': {
-      backgroundColor: 'var(--d-canvas)',
-      color: '#6e7178',
-      border: 'none',
-    },
-    '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 12px' },
-    '&.cm-focused': { outline: 'none' },
+/// 编辑器外观规格: 颜色全部走主题 tokens(亮暗由 html[data-theme] 翻转),
+/// 亮暗两个实例只差 CM6 的 dark 标志(决定原生选区/光标等的基础配色)
+const themeSpec = {
+  '&': {
+    backgroundColor: 'var(--d-canvas)',
+    color: 'var(--d-text)',
+    height: '100%',
+    // 字号/字体走设置系统的可覆盖变量(进入 /merge 时编辑器新建, 取当次值)
+    fontSize: 'var(--editor-font-size, 12px)',
   },
-  { dark: true }
-);
+  '.cm-scroller': {
+    fontFamily: 'var(--editor-font-family, var(--font-mono))',
+    lineHeight: '1.6',
+    overflow: 'auto',
+    // 三栏同步滚动, 原生滚动条只剩噪音: 全部隐藏, 导航交给滚轮与 overview ruler
+    scrollbarWidth: 'none',
+  },
+  '.cm-scroller::-webkit-scrollbar': { display: 'none' },
+  // 行号槽不设竖分隔线: chunk 行的槽位与内容同色(gutterLineClass), 色带得以穿过行号列(IDEA 行为)
+  '.cm-gutters': {
+    backgroundColor: 'var(--d-canvas)',
+    color: 'var(--d-gutter)',
+    border: 'none',
+  },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 12px' },
+  '&.cm-focused': { outline: 'none' },
+};
+
+/** IDEA New UI 暗色编辑器外观 */
+export const ideaThemeDark = EditorView.theme(themeSpec, { dark: true });
+
+/** IDEA New UI 亮色编辑器外观 */
+export const ideaThemeLight = EditorView.theme(themeSpec, { dark: false });
 
 /** IDEA Dark 代码配色(近似初值, M5 逐像素校准) */
-export const ideaHighlight = HighlightStyle.define([
+export const ideaHighlightDark = HighlightStyle.define([
   { tag: [t.keyword, t.modifier, t.operatorKeyword], color: '#cf8e6d' },
   { tag: [t.string, t.special(t.string), t.regexp], color: '#6aab73' },
   { tag: [t.comment, t.blockComment], color: '#7a7e85', fontStyle: 'italic' },
@@ -60,6 +64,28 @@ export const ideaHighlight = HighlightStyle.define([
   { tag: t.tagName, color: '#d5b778' },
   { tag: t.attributeName, color: '#c77dbb' },
 ]);
+
+/** IDEA Light 代码配色(近似初值, M5 逐像素校准) */
+export const ideaHighlightLight = HighlightStyle.define([
+  { tag: [t.keyword, t.modifier, t.operatorKeyword], color: '#0033b3' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: '#067d17' },
+  { tag: [t.comment, t.blockComment], color: '#8c8c8c', fontStyle: 'italic' },
+  { tag: [t.number, t.bool], color: '#1750eb' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: '#00627a' },
+  { tag: [t.typeName, t.className, t.namespace], color: '#7a3e9d' },
+  { tag: t.propertyName, color: '#871094' },
+  { tag: [t.meta, t.annotation], color: '#9e880d' },
+  { tag: t.tagName, color: '#0033b3' },
+  { tag: t.attributeName, color: '#174ad4' },
+]);
+
+/** 按主题取编辑器外观扩展(主题 + 语法高亮) */
+export function appearanceExtensions(light: boolean): Extension[] {
+  return [
+    light ? ideaThemeLight : ideaThemeDark,
+    syntaxHighlighting(light ? ideaHighlightLight : ideaHighlightDark, { fallback: true }),
+  ];
+}
 
 /** 按文件名匹配语言支持(找不到或加载失败返回空扩展) */
 export async function languageFor(path: string): Promise<Extension> {
@@ -158,14 +184,13 @@ export function createPane(parent: HTMLElement, text: string, extensions: Extens
   return new EditorView({ state: EditorState.create({ doc: text, extensions }), parent });
 }
 
-/** 常用只读侧栏扩展集 */
-export function readonlyExtensions(lang: Extension): Extension[] {
+/** 常用只读侧栏扩展集(light 按设置主题传入) */
+export function readonlyExtensions(lang: Extension, light = false): Extension[] {
   return [
     lineNumbers(),
     EditorView.editable.of(false),
     EditorState.readOnly.of(true),
-    ideaTheme,
-    syntaxHighlighting(ideaHighlight, { fallback: true }),
+    ...appearanceExtensions(light),
     lang,
   ];
 }

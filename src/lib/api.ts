@@ -20,6 +20,12 @@ export type LaunchKind = 'pull' | 'merge' | 'rebase' | 'cherry-pick' | 'revert';
 /** 关闭窗口时的行为 */
 export type CloseBehavior = 'tray' | 'quit';
 
+/** 界面主题 */
+export type AppTheme = 'dark' | 'light';
+
+/** 界面语言: zh = 分层设计(大窗英文/小窗中文), en = 全英文 */
+export type Language = 'zh' | 'en';
+
 /** 用户设置(与 Rust settings.rs 严格镜像; 存 app-data/settings.json, 跨版本保留) */
 export interface Settings {
   /** 编辑器字号(px), Rust 侧钳制 8–32 */
@@ -30,6 +36,10 @@ export interface Settings {
   closeBehavior: CloseBehavior;
   /** 三栏词级强调的默认开关 */
   highlightWords: boolean;
+  /** 界面主题 */
+  theme: AppTheme;
+  /** 界面语言 */
+  language: Language;
 }
 
 /** 发起操作的结果 */

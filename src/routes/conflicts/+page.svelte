@@ -6,6 +6,7 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, opTitleSegments, type FileRow, type OutputLine } from '$lib/api';
   import { rafBatcher } from '$lib/batch';
+  import { t } from '$lib/i18n.svelte';
   import { largeWindow } from '$lib/win';
   import { pushTerm, session } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
@@ -335,7 +336,7 @@
         <label><input type="checkbox" bind:checked={groupByDir} /> Group files by directory</label>
         <span class="spacer"></span>
         <button onclick={() => (abortAsk = true)}>Abort</button>
-        <button title="暂时关闭, 操作与已解决进度保留, 可从菜单恢复" onclick={park}>Close</button>
+        <button title={t('park-title')} onclick={park}>Close</button>
       </footer>
     {/if}
   </div>
@@ -395,7 +396,7 @@
     overflow: auto;
     border: 1px solid var(--d-border);
     border-radius: 8px;
-    background: #26282b;
+    background: var(--d-table);
   }
 
   table {

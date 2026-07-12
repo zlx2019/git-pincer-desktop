@@ -1,6 +1,7 @@
 <script lang="ts">
-  // 设置对话框(菜单小窗入口, 中文文案): 即改即存——每项落定立即写 CSS 变量并持久化,
+  // 设置对话框(菜单小窗入口, 文案随语言设置): 即改即存——每项落定立即生效并持久化,
   // 无 OK/Cancel 暂存语义; "完成"只是关闭
+  import { t } from '$lib/i18n.svelte';
   import { DEFAULT_SETTINGS, settings, updateSettings } from '$lib/settings.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
@@ -19,11 +20,39 @@
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
 <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-  <div class="modal" role="dialog" aria-modal="true" aria-label="设置">
-    <h3>设置</h3>
+  <div class="modal" role="dialog" aria-modal="true" aria-label={t('set-title')}>
+    <h3>{t('set-title')}</h3>
     <div class="rows">
+      <div class="row">
+        <span class="lbl">{t('set-theme')}</span>
+        <div class="seg" role="radiogroup" aria-label={t('set-theme')}>
+          <button
+            class:on={settings.value.theme === 'dark'}
+            onclick={() => updateSettings({ theme: 'dark' })}>{t('set-theme-dark')}</button
+          >
+          <button
+            class:on={settings.value.theme === 'light'}
+            onclick={() => updateSettings({ theme: 'light' })}>{t('set-theme-light')}</button
+          >
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="lbl">{t('set-lang')}</span>
+        <div class="seg" role="radiogroup" aria-label={t('set-lang')}>
+          <button
+            class:on={settings.value.language === 'zh'}
+            onclick={() => updateSettings({ language: 'zh' })}>中文</button
+          >
+          <button
+            class:on={settings.value.language === 'en'}
+            onclick={() => updateSettings({ language: 'en' })}>English</button
+          >
+        </div>
+      </div>
+
       <label class="row">
-        <span class="lbl">编辑器字号</span>
+        <span class="lbl">{t('set-font-size')}</span>
         <span class="ctl">
           <input
             class="num"
@@ -38,32 +67,32 @@
       </label>
 
       <label class="row">
-        <span class="lbl">编辑器字体</span>
+        <span class="lbl">{t('set-font-family')}</span>
         <input
           class="txt mono"
           type="text"
-          placeholder="JetBrains Mono (内嵌)"
+          placeholder={t('set-font-ph')}
           value={settings.value.editorFontFamily}
           onchange={commitFamily}
         />
       </label>
 
       <div class="row">
-        <span class="lbl">关闭窗口时</span>
-        <div class="seg" role="radiogroup" aria-label="关闭窗口时">
+        <span class="lbl">{t('set-close')}</span>
+        <div class="seg" role="radiogroup" aria-label={t('set-close')}>
           <button
             class:on={settings.value.closeBehavior === 'tray'}
-            onclick={() => updateSettings({ closeBehavior: 'tray' })}>收进托盘</button
+            onclick={() => updateSettings({ closeBehavior: 'tray' })}>{t('set-close-tray')}</button
           >
           <button
             class:on={settings.value.closeBehavior === 'quit'}
-            onclick={() => updateSettings({ closeBehavior: 'quit' })}>退出应用</button
+            onclick={() => updateSettings({ closeBehavior: 'quit' })}>{t('set-close-quit')}</button
           >
         </div>
       </div>
 
       <label class="row">
-        <span class="lbl">词级强调默认开启</span>
+        <span class="lbl">{t('set-words')}</span>
         <input
           type="checkbox"
           checked={settings.value.highlightWords}
@@ -73,10 +102,10 @@
       </label>
     </div>
     <footer>
-      <button onclick={() => updateSettings({ ...DEFAULT_SETTINGS })}>恢复默认</button>
-      <span class="hint dim">即改即存 · 保存在本机</span>
+      <button onclick={() => updateSettings({ ...DEFAULT_SETTINGS })}>{t('set-reset')}</button>
+      <span class="hint dim">{t('set-hint')}</span>
       <span class="spacer"></span>
-      <button class="primary" onclick={onclose}>完成</button>
+      <button class="primary" onclick={onclose}>{t('set-done')}</button>
     </footer>
   </div>
 </div>
@@ -191,7 +220,7 @@
   }
 
   .seg button.on {
-    background: #243252;
+    background: var(--d-sel-dim);
     color: var(--d-sel-text);
   }
 

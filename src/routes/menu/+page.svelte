@@ -6,6 +6,7 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { api, type LaunchKind, type OutputLine } from '$lib/api';
   import { rafBatcher } from '$lib/batch';
+  import { t } from '$lib/i18n.svelte';
   import { pushTerm, session, term, type TermEntry } from '$lib/state.svelte';
   import { toast } from '$lib/toast.svelte';
   import { compactWindow } from '$lib/win';
@@ -28,41 +29,31 @@
   let settingsOpen = $state(false);
   let termEl: HTMLElement | undefined = $state();
 
-  // 图标为静态字面量, {@html} 安全
-  const actions: { kind: LaunchKind; label: string; zh: string; desc: string; icon: string }[] = [
+  // 图标为静态字面量, {@html} 安全; 短名/描述文案走 i18n 词典(act-*/actd-*)
+  const actions: { kind: LaunchKind; label: string; icon: string }[] = [
     {
       kind: 'pull',
       label: 'pull',
-      zh: '拉取远端',
-      desc: '从跟踪的远端拉取最新提交并合并',
       icon: '<svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7M4.8 6.8 8 10l3.2-3.2M3 13.5h10"/></svg>',
     },
     {
       kind: 'merge',
       label: 'merge',
-      zh: '合并分支',
-      desc: '选择一个分支合并进当前分支',
       icon: '<svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="3.5" r="1.7"/><circle cx="4.5" cy="12.5" r="1.7"/><circle cx="11.5" cy="8" r="1.7"/><path d="M4.5 5.2v5.6M4.5 6.5c0 2 2.7 1.5 5.3 1.5"/></svg>',
     },
     {
       kind: 'rebase',
       label: 'rebase',
-      zh: '变基分支',
-      desc: '将当前分支变基到目标分支之上',
       icon: '<svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h6.5M3 8h4.5M3 12h6.5M12.5 3.5v7.5M10.6 9.2l1.9 1.9 1.9-1.9"/></svg>',
     },
     {
       kind: 'cherry-pick',
       label: 'cherry-pick',
-      zh: '摘取提交',
-      desc: '从其他分支摘取提交应用到当前分支',
       icon: '<svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="11.2" r="2.1"/><circle cx="10.9" cy="11.9" r="2.1"/><path d="M5.4 9.1C5.4 6 7.6 4.6 10.2 2.6M10.9 9.8C10.6 6.9 9.7 5.4 10.2 2.6"/></svg>',
     },
     {
       kind: 'revert',
       label: 'revert',
-      zh: '撤销提交',
-      desc: '生成反向提交, 撤销所选提交的改动',
       icon: '<svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5v4h4"/><path d="M3.8 7.2a4.9 4.9 0 1 0 1.1-3"/></svg>',
     },
   ];
@@ -178,7 +169,7 @@
           kind,
           multi: false,
           confirm: kind === 'merge' ? 'Merge' : 'Rebase',
-          title: kind === 'merge' ? `合并分支 → ${current}` : `变基 ${current} 到目标分支`,
+          title: kind === 'merge' ? t('dlg-merge', current) : t('dlg-rebase', current),
           items: bs.map((b) => ({
             id: b.name,
             label: b.name,
@@ -193,7 +184,7 @@
           kind,
           multi: true,
           confirm: kind === 'cherry-pick' ? 'Cherry-pick' : 'Revert',
-          title: kind === 'cherry-pick' ? '摘取提交(可多选)' : '撤销提交(可多选)',
+          title: kind === 'cherry-pick' ? t('dlg-cherry-pick') : t('dlg-revert'),
           items: cs.map((c) => ({
             id: c.sha,
             label: c.subject,
@@ -238,7 +229,7 @@
         await goto('/conflicts');
       } else if (outcome.kind === 'cleanDone') {
         const secs = ((Date.now() - started) / 1000).toFixed(1);
-        pushTerm({ kind: 'ok', text: `✔ 完成 · 用时 ${secs}s` });
+        pushTerm({ kind: 'ok', text: t('term-done', secs) });
       } else {
         pushTerm({ kind: 'fail', text: `✘ ${outcome.message}` });
       }
@@ -296,7 +287,7 @@
           <path d="M1.5 4.5a1 1 0 0 1 1-1h3l1.5 1.8h6.5a1 1 0 0 1 1 1v1.2M3.5 13.5l1.6-5h9.9l-1.6 5z" />
         </svg>
       </button>
-      <button class="iconbtn gear" title="设置" onclick={() => (settingsOpen = true)}>
+      <button class="iconbtn gear" title={t('set-title')} onclick={() => (settingsOpen = true)}>
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
           <circle cx="8" cy="8" r="2.4" />
           <path d="M8 1.6v2.1M8 12.3v2.1M1.6 8h2.1M12.3 8h2.1M3.5 3.5 5 5M11 11l1.5 1.5M12.5 3.5 11 5M5 11l-1.5 1.5" />
@@ -307,7 +298,7 @@
     <div class="body">
       <div class="brand">
         <span class="logo mono">PINCER</span>
-        <span class="sub">指令面板</span>
+        <span class="sub">{t('brand-sub')}</span>
       </div>
 
       {#if info.op}
@@ -317,12 +308,12 @@
           <span class="bn-text">
             <span class="bn-line">
               <span class="bn-name mono">git {info.op}</span>
-              <span class="bn-zh">进行中 · 已搁置</span>
+              <span class="bn-zh">{t('resume-state')}</span>
             </span>
             <span class="bn-sub">
               {session.files.length
-                ? `${session.files.length} 个冲突待解决 · 点击恢复`
-                : '冲突已全部解决, 点击继续 (continue)'}
+                ? t('resume-pending', session.files.length)
+                : t('resume-done')}
             </span>
           </span>
           <svg class="bn-go" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -342,9 +333,9 @@
           <span class="rtext">
             <span class="rline">
               <span class="rname mono">{a.label}</span>
-              <span class="rzh">{a.zh}</span>
+              <span class="rzh">{t(`act-${a.kind}`)}</span>
             </span>
-            <span class="rdesc">{a.desc}</span>
+            <span class="rdesc">{t(`actd-${a.kind}`)}</span>
           </span>
           {#if running === a.kind}
             <span class="spin"></span>
@@ -357,7 +348,7 @@
       {#if term.entries.length}
         <div class="term">
           <div class="tabs">
-            <span class="tab active">执行输出</span>
+            <span class="tab active">{t('term-tab')}</span>
             <button class="iconbtn" title="Clear output" onclick={() => (term.entries = [])}>
               <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M2.5 4h11M5.5 4V2.8a.8.8 0 0 1 .8-.8h3.4a.8.8 0 0 1 .8.8V4M4 4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4" />
@@ -390,11 +381,11 @@
       </span>
       <span class="spacer"></span>
       {#if running}
-        <span class="sb-busy">● 执行中</span>
+        <span class="sb-busy">{t('sb-running')}</span>
       {:else if info.op}
-        <span class="sb-busy">● {info.op} 进行中</span>
+        <span class="sb-busy">{t('sb-oping', info.op)}</span>
       {:else}
-        <span class="sb-ready">● 就绪</span>
+        <span class="sb-ready">{t('sb-ready')}</span>
       {/if}
     </div>
   </div>
@@ -413,7 +404,7 @@
 
 {#if switchItems}
   <PickerDialog
-    title="切换分支"
+    title={t('dlg-switch')}
     items={switchItems}
     confirmLabel="Switch"
     onconfirm={doSwitch}
@@ -664,7 +655,7 @@
   .rdesc {
     display: none;
     font-size: 11px;
-    color: #9db4d8;
+    color: var(--d-desc);
   }
 
   .row:hover:not(:disabled) .rdesc,
@@ -683,8 +674,8 @@
   }
 
   .row:hover:not(:disabled) .kbd {
-    background: #243252;
-    border-color: #3a4c74;
+    background: var(--d-sel-dim);
+    border-color: var(--d-sel-dim-border);
     color: var(--d-sel-text);
   }
 
