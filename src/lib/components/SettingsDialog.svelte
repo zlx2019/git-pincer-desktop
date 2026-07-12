@@ -101,6 +101,7 @@
         />
       </label>
     </div>
+    <p class="note dim">{t('set-editor-note')}</p>
     <footer>
       <button onclick={() => updateSettings({ ...DEFAULT_SETTINGS })}>{t('set-reset')}</button>
       <span class="hint dim">{t('set-hint')}</span>
@@ -242,6 +243,12 @@
   }
 
   .hint {
+    font-size: 11px;
+  }
+
+  /* 三栏编辑器随路由新建, 相关设置非即时生效: 对话框内注明避免"没反应"误判 */
+  .note {
+    margin: 8px 2px 0;
     font-size: 11px;
   }
 

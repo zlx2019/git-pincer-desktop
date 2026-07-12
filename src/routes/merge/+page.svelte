@@ -20,7 +20,7 @@
     type ChunkState,
   } from '$lib/chunks';
   import { session } from '$lib/state.svelte';
-  import { settings } from '$lib/settings.svelte';
+  import { settings, settingsUi } from '$lib/settings.svelte';
   import { toast } from '$lib/toast.svelte';
   import { largeWindow } from '$lib/win';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -503,9 +503,9 @@
     );
   }
 
-  /** 快捷键: F7/⇧F7 导航, ⌘/Ctrl+⏎ Apply, Esc 回列表(对齐 IDEA); 确认框打开时让位给对话框 */
+  /** 快捷键: F7/⇧F7 导航, ⌘/Ctrl+⏎ Apply, Esc 回列表(对齐 IDEA); 对话框打开时让位 */
   function hotkeys(e: KeyboardEvent) {
-    if (applyAsk) return;
+    if (applyAsk || settingsUi.open) return;
     if (e.key === 'F7') {
       e.preventDefault();
       nav(e.shiftKey ? -1 : 1);

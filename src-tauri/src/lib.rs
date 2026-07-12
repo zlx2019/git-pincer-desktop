@@ -8,7 +8,7 @@ pub mod settings;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// 唤回主窗口(托盘菜单/图标点击与 macOS Dock 重开共用)
 fn show_main_window(app: &AppHandle) {
@@ -55,6 +55,30 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+/// macOS 应用菜单: 在默认菜单的应用子菜单里插入 "设置…"(⌘,, macOS 惯例位 = About 之后)。
+/// 仅 macOS——其余平台设应用菜单会给窗口顶部凭空加一条菜单栏, 不符合窗口形态
+#[cfg(target_os = "macos")]
+fn build_app_menu(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{MenuItemKind, PredefinedMenuItem};
+
+    let label = app
+        .state::<commands::AppState>()
+        .language()
+        .settings_label();
+    let menu = Menu::default(app.handle())?;
+    let settings = MenuItem::with_id(app, "settings", label, true, Some("Cmd+,"))?;
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        // 默认应用子菜单结构: [About, 分隔线, Services, ...] → 设置项插在首个分隔线之后
+        let pos = usize::min(2, app_menu.items()?.len());
+        app_menu.insert(&settings, pos)?;
+        app_menu.insert(&PredefinedMenuItem::separator(app)?, pos + 1)?;
+    }
+    app.set_menu(menu)?;
+    app.state::<commands::AppState>()
+        .set_menu_settings_item(settings);
+    Ok(())
+}
+
 /// 应用入口: 注册插件、全局状态与全部命令; 关窗收进托盘, 退出走托盘菜单
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -89,9 +113,19 @@ pub fn run() {
             app.state::<commands::AppState>()
                 .init_settings(loaded.clone());
             build_tray(app)?;
+            #[cfg(target_os = "macos")]
+            build_app_menu(app)?;
             // 窗口原生主题/底色按持久化设置就位(窗口尚未 show, 无闪变)
             commands::apply_to_shell(app.handle(), &loaded);
             Ok(())
+        })
+        .on_menu_event(|app, e| {
+            // 应用菜单 "设置…": 唤回窗口(可能正驻留托盘)并通知前端弹设置对话框;
+            // 托盘菜单的 show/quit 由托盘自己的 on_menu_event 处理, 此处忽略
+            if e.id.as_ref() == "settings" {
+                show_main_window(app);
+                let _ = app.emit("app://open-settings", ());
+            }
         })
         .on_window_event(|window, event| {
             // 关窗行为由设置决定: 收进托盘(默认, 会话状态原样保留)或直接退出

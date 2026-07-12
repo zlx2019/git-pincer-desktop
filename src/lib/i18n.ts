@@ -66,6 +66,10 @@ export const dict = {
   'set-reset': ['恢复默认', 'Reset to defaults'],
   'set-hint': ['即改即存 · 保存在本机', 'Saved locally as you change'],
   'set-done': ['完成', 'Done'],
+  'set-editor-note': [
+    '编辑器字号/字体/主题在重新进入合并页后生效',
+    'Editor font and theme apply when you re-open the merge view',
+  ],
 } as const;
 
 /** 词条键 */

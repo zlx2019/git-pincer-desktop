@@ -21,13 +21,15 @@ type TrayItems = (
     tauri::menu::MenuItem<tauri::Wry>,
 );
 
-/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态 + 用户设置(启动时从盘加载) + 托盘句柄
+/// 全局状态: 当前打开仓库的定位 + 已应用的窗口形态 + 用户设置(启动时从盘加载)
+/// + 托盘/应用菜单句柄(语言切换就地改文案)
 #[derive(Default)]
 pub struct AppState {
     repo: Mutex<Option<Repo>>,
     win_form: Mutex<Option<WinForm>>,
     settings: Mutex<Settings>,
     tray: Mutex<Option<TrayItems>>,
+    menu_settings: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
 }
 
 impl AppState {
@@ -47,6 +49,11 @@ impl AppState {
     /// 托盘建好后登记菜单项句柄(语言切换要就地改文案)
     pub fn set_tray_items(&self, items: TrayItems) {
         *self.tray.lock().unwrap_or_else(|e| e.into_inner()) = Some(items);
+    }
+
+    /// 应用菜单"设置"项句柄登记(macOS; 语言切换要就地改文案)
+    pub fn set_menu_settings_item(&self, item: tauri::menu::MenuItem<tauri::Wry>) {
+        *self.menu_settings.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
     }
 
     /// 关窗是否收进托盘(lib.rs 的关闭拦截按此分流)
@@ -79,6 +86,13 @@ pub fn apply_to_shell(app: &AppHandle, s: &Settings) {
         let (show_txt, quit_txt) = s.language.tray_labels();
         let _ = show.set_text(show_txt);
         let _ = quit.set_text(quit_txt);
+    }
+    let menu_settings = state
+        .menu_settings
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if let Some(item) = &*menu_settings {
+        let _ = item.set_text(s.language.settings_label());
     }
 }
 

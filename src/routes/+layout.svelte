@@ -4,8 +4,10 @@
   import { onMount } from 'svelte';
   import { dev } from '$app/environment';
   import { getCurrentWindow } from '@tauri-apps/api/window';
-  import { loadSettings } from '$lib/settings.svelte';
+  import { api } from '$lib/api';
+  import { loadSettings, settingsUi } from '$lib/settings.svelte';
   import { toasts } from '$lib/toast.svelte';
+  import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 
   let { children } = $props();
 
@@ -20,6 +22,13 @@
         .then(() => win.setFocus())
         .catch(() => {});
     });
+    // macOS 应用菜单 "设置…" → 弹全局设置对话框
+    let unlisten: (() => void) | undefined;
+    api
+      .onOpenSettings(() => (settingsUi.open = true))
+      .then((u) => (unlisten = u))
+      .catch(() => {});
+    return () => unlisten?.();
   });
 
   /** 生产加固: 桌面应用不出现浏览器右键菜单;
@@ -36,6 +45,12 @@
   /** 生产加固: 拦截 webview 刷新/打印快捷键(WebView2 默认启用浏览器加速键;
       刷新会丢会话状态回打开页) */
   function hardenKeys(e: KeyboardEvent) {
+    // ⌘,/Ctrl+, 开设置(菜单加速键的 webview 侧双保险; Windows/Linux 无应用菜单全靠这里)
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      e.preventDefault();
+      settingsUi.open = true;
+      return;
+    }
     if (dev) return;
     const mod = e.metaKey || e.ctrlKey;
     if (e.key === 'F5' || (mod && ['r', 'R', 'p', 'P'].includes(e.key))) {
@@ -47,6 +62,10 @@
 <svelte:window oncontextmenu={contextmenu} onkeydown={hardenKeys} />
 
 {@render children()}
+
+{#if settingsUi.open}
+  <SettingsDialog onclose={() => (settingsUi.open = false)} />
+{/if}
 
 {#if toasts.list.length}
   <div class="toasts">

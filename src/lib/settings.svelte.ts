@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS: Settings = {
 /** 全局设置状态(所有页面共享) */
 export const settings = $state({ value: { ...DEFAULT_SETTINGS } });
 
+/** 设置对话框开关(渲染在根布局, 任何页面可弹: 齿轮 / macOS 应用菜单 / ⌘,) */
+export const settingsUi = $state({ open: false });
+
 let loaded = false;
 
 /** 启动加载(root layout onMount 调一次); 命令不可用(测试/mock 环境)时按默认运行 */

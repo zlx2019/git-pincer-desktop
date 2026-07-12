@@ -52,6 +52,14 @@ impl Language {
             Language::En => ("Show Window", "Quit"),
         }
     }
+
+    /// 应用菜单"设置"项文案(macOS 菜单栏, 省略号是 macOS 惯例)
+    pub fn settings_label(self) -> &'static str {
+        match self {
+            Language::Zh => "设置…",
+            Language::En => "Settings…",
+        }
+    }
 }
 
 /// 用户设置(与前端 `api.ts` 的 `Settings` 严格镜像, camelCase)

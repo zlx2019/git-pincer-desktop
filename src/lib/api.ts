@@ -145,6 +145,8 @@ export const api = {
   /** 订阅 continue 的输出流 */
   onOutput: (cb: (l: OutputLine) => void): Promise<UnlistenFn> =>
     listen<OutputLine>('git://output', (e) => cb(e.payload)),
+  /** 订阅"打开设置"通知(macOS 应用菜单 设置… 触发) */
+  onOpenSettings: (cb: () => void): Promise<UnlistenFn> => listen('app://open-settings', cb),
 };
 
 /** 标题片段(bold 的片段渲染为粗体) */
