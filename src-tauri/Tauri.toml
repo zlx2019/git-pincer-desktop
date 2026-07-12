@@ -26,8 +26,11 @@ accept-first-mouse = true
 background-color = "#1e1f22"
 theme = "Dark"
 
-# csp 不写 = 原 JSON 的 null(TOML 无 null 字面量)
+# CSP 加固(纯静态 SPA, 无远程内容): 脚本/连接仅限自身与 Tauri IPC 通道
+# (macOS 走 ipc:, Windows 走 http://ipc.localhost, Tauri 会为自身注入脚本加 nonce);
+# style 需 unsafe-inline(CM6/Svelte 大量内联样式), 字体/图片全部随包分发
 [app.security]
+csp = "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
 
 [bundle]
 active = true
@@ -47,3 +50,19 @@ icon = [
   "icons/icon.icns",
   "icons/icon.ico",
 ]
+
+# Tauri 2 支持下限即 Catalina, 显式声明作为支持承诺写进 Info.plist
+[bundle.macos]
+minimum-system-version = "10.15"
+
+# 安装器界面跟应用一样中英双语, 首次安装弹语言选择
+[bundle.windows.nsis]
+languages = ["SimpChinese", "English"]
+display-language-selector = true
+
+[bundle.windows.wix]
+language = ["zh-CN", "en-US"]
+
+# Debian 软件分区: vcs = 版本控制工具类
+[bundle.linux.deb]
+section = "vcs"
