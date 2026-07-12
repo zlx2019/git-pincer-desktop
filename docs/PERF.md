@@ -20,7 +20,10 @@ git 输出前端合帧、单 IPC 切窗、构建参数调优——本轮在其�
 启动/首屏:
 
 - ☑ 浅色主题首帧闪变: `data-theme` 在 get_settings IPC 返回后才落 DOM，而 `show()` 首帧 rAF 就触发
-  → 浅色用户每次启动暗→亮闪一下。已改为设置就位后（150ms 兜底竞速）再 rAF show。(+layout)
+  → 浅色用户每次启动暗→亮闪一下。已改为设置就位后（150ms 兜底竞速）直接 show。(+layout)
+  ⚠ 初版在 show 外还包了一层 rAF——macOS 实机死锁: 隐藏窗口 WKWebView 不产帧，
+  回调永不触发，窗口永不出现（点 Dock 图标经 Reopen 才被 Rust 侧救活）。v0.1.0 验收发现后去掉；
+  显窗早于首帧无闪变，透出的是 Rust 已按主题就位的原生底色。
 - ☑ SettingsDialog 挪出 boot chunk: 静态 import 把 plugin-opener + getVersion 拖进 nodes/0，
   实际渲染在 `{#if settingsUi.open}` 之后。已改 `{#await import(...)}`。(+layout)
 

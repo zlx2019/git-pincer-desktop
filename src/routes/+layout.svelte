@@ -11,17 +11,17 @@
   let { children } = $props();
 
   onMount(() => {
-    // 窗口配置 visible:false: 等设置就位(data-theme 已落 DOM, 浅色用户不再暗→亮闪变)
-    // 且首帧绘制完成后再显示; loadSettings 挂掉/超时则 150ms 兜底显窗, 不能让窗口不出来
+    // 窗口配置 visible:false: 等设置就位(data-theme 已同步落 DOM, 浅色用户不再暗→亮闪变)
+    // 后立即显示。不可等 rAF——隐藏窗口在 WKWebView 上不产帧, rAF 回调永不触发,
+    // 窗口会永远不出现(v0.1.0 macOS 实机回归); 早于首帧显窗也无闪变, 透出的是
+    // Rust 在 setup 里已按主题就位的原生底色。loadSettings 挂掉则 150ms 兜底显窗
     const fallback = new Promise((r) => setTimeout(r, 150));
     Promise.race([loadSettings(), fallback]).then(() => {
-      requestAnimationFrame(() => {
-        const win = getCurrentWindow();
-        win
-          .show()
-          .then(() => win.setFocus())
-          .catch(() => {});
-      });
+      const win = getCurrentWindow();
+      win
+        .show()
+        .then(() => win.setFocus())
+        .catch(() => {});
     });
     // macOS 应用菜单 "设置…" → 弹全局设置对话框
     let unlisten: (() => void) | undefined;
