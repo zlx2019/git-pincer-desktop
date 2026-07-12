@@ -41,7 +41,7 @@ Layered UI language: large windows (Conflicts / three-pane) keep the original ID
 (the 1:1 restoration baseline), small-window helper copy defaults to Chinese; switch to full
 English in Settings.
 
-Design baselines live in `docs/IDEA_STYLE.md` and `docs/PLAN.md`.
+Design baselines live in `docs/PLAN.md`.
 
 ## Install
 

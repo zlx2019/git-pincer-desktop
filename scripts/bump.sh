@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# 发布一条龙: 同步版本号 → 重新生成 CHANGELOG → 提交(过 pre-commit 全套门禁) → 打 tag。
-# 版本号只存两处: package.json(权威源, Tauri.toml 的 version 指向它) + src-tauri/Cargo.toml。
-# 推送刻意留给人工——下面这步才会触发 release.yml 出四平台产物:
-#   git push && git push --tags
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

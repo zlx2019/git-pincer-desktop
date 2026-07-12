@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 IDEA 风格的 Git 冲突解决桌面端 (Tauri 2 + SvelteKit/Svelte 5 + CodeMirror 6, 合并引擎在 Rust)。功能对齐姊妹项目 git-pincer (CLI)，但代码独立实现。**只做冲突解决流程**（发起操作 → 冲突列表 → 三栏合并 → continue/abort），不做 log/commit/push 等通用 git 客户端功能。
 
-技术方案的权威文档是 `docs/PLAN.md`（架构、命令表、UI 还原清单、已定稿的默认决定）。PLAN 残留少量 v2 时代的陈旧表述，以定稿决定与代码现状为准：全局 IDEA New UI **暗色**（非 Light）、diff 在 Rust 侧 **500ms** deadline（非 Web Worker/300ms）、事件只有 `git://output`（`git://round`/`git://done` 未实现，结局走命令返回值）、终端面板是手写 CSS（非 xterm.js）。样式基准分层：`docs/IDEA_STYLE.md` 定义全局 IDEA New UI 三层灰暗色基调，根目录 mockup 是**菜单小窗**的形态基准，冲突列表与三栏的布局则按 IDEA 参考截图 1:1 还原——截图不在仓库内（M5 像素校准依赖 Zero 的截图反馈）。
+技术方案的权威文档是 `docs/PLAN.md`（架构、命令表、UI 还原清单、已定稿的默认决定）。PLAN 残留少量 v2 时代的陈旧表述，以定稿决定与代码现状为准：全局 IDEA New UI **暗色**（非 Light）、diff 在 Rust 侧 **500ms** deadline（非 Web Worker/300ms）、事件只有 `git://output`（`git://round`/`git://done` 未实现，结局走命令返回值）、终端面板是手写 CSS（非 xterm.js）。样式基准：全局 IDEA New UI 三层灰暗色基调与用色约定见 PLAN §5.0/§6 与 theme.css（早期的 IDEA_STYLE.md 与根目录 mockup 已删，2026-07-12——要点已并入 PLAN，菜单小窗形态亦已落定）；冲突列表与三栏的布局按 IDEA 参考截图 1:1 还原——截图不在仓库内（M5 像素校准依赖 Zero 的截图反馈）。
 
 ## 常用命令
 

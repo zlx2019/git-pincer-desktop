@@ -28,7 +28,7 @@ Tauri 2 · SvelteKit (Svelte 5) · CodeMirror 6 · 合并引擎在 Rust (`simila
 
 界面语言分层: 大窗 (Conflicts / 三栏) 保持 IDEA 英文原文 (1:1 还原基准), 小窗辅助文案默认中文; 设置里可切全英文。
 
-设计基准见 `docs/IDEA_STYLE.md` 与 `docs/PLAN.md`。
+设计基准见 `docs/PLAN.md`。
 
 ## 安装
 

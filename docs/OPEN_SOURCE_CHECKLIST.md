@@ -11,7 +11,7 @@
 | 社区 | `CONTRIBUTING.md` · `SECURITY.md` · issue 模板 ×2 · PR 模板 · dependabot |
 | 工程 | CI (fmt/clippy/nextest/doc/deny/typos/svelte-check/vitest/build) · release.yml 四平台矩阵 · git-cliff · pre-commit · `.editorconfig` · `rust-toolchain.toml` |
 | 品牌 | 应用图标全尺寸 (源 `assets/icon.svg`; v2 2026-07-12 Zero 设计: 深蓝底+品牌橙齿轮盘+merge 分叉图, 含 Windows Store 全尺寸) · favicon 同步 · 托盘 template 剪影同构 (`assets/tray.svg`) |
-| 文档 | README (中文) · `docs/PLAN.md` (技术方案) · `docs/IDEA_STYLE.md` (样式基准) · `CLAUDE.md` |
+| 文档 | README (英文默认 + 中文镜像) · `docs/PLAN.md` (技术方案, 含样式基准) · `CLAUDE.md` |
 
 ---
 

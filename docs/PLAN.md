@@ -90,9 +90,9 @@ Rust 壳不持业务状态; **diff/分块引擎放 Rust(`similar`, 2026-07-10 Ze
 
 ## 5. 界面还原清单
 
-### 5.0 菜单指令面板 (无冲突时的入口, 对齐 CLI; 样式基准: docs/IDEA_STYLE.md + 根目录 mockup)
+### 5.0 菜单指令面板 (无冲突时的入口, 对齐 CLI; 本节即样式基准——IDEA_STYLE.md 与根目录 mockup 已删, 2026-07-12, 要点并入此处)
 
-**小窗形态** (IDEA New UI 三层灰暗色 #1e1f22/#2b2d30/#393b40): 顶栏仓库/分支 chip → PINCER 品牌行 → 五条指令行(图标 + 英文命令 mono + 中文说明 + **真实 ⌘1–⌘5 快捷键**, hover/执行中显示描述行, Search-Everywhere 蓝 #2e436e 选中) → 底部终端风执行输出(➜ 命令回显、stderr 红、✔/✘ 尾行、橙色闪烁光标、可清空) → 状态栏(分支 + 就绪/执行中)。**PINCER 橙 #ff7a2f 仅用于 logo / 活动 tab 下划线 / 终端光标**。mockup 中的左侧工具 rail 与"终端/Git 日志"假 tab 暂不放(未实现的功能不摆死按钮)。
+**小窗形态** (IDEA New UI 三层灰暗色 #1e1f22/#2b2d30/#393b40): 顶栏仓库/分支 chip → PINCER 品牌行 → 五条指令行(图标 + 英文命令 mono + 中文说明 + **真实 ⌘1–⌘5 快捷键**, hover/执行中显示描述行, Search-Everywhere 蓝 #2e436e 选中) → 底部终端风执行输出(➜ 命令回显、stderr 红、✔/✘ 尾行、橙色闪烁光标、可清空) → 状态栏(分支 + 就绪/执行中)。**PINCER 橙 #ff7a2f 仅用于 logo / 活动 tab 下划线 / 终端光标**。早期 mockup 里的左侧工具 rail 与"终端/Git 日志"假 tab 未实现也不摆(未实现的功能不摆死按钮)。
 
 - merge / rebase → 分支选择对话框(单选, 当前分支置灰, 双击即确认);
 - cherry-pick → 提交多选(`--all --not HEAD`, 按旧→新顺序应用); revert → 当前分支提交多选(新→旧应用);

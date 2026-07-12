@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# 造一个带现成 merge 冲突的演示仓库(默认 /tmp/pincer-demo), 30 秒体验 PINCER:
-# 文本冲突 ×2 (hello.rs / notes.txt) + 二进制冲突 ×1 (logo.bin, 走 pick-one)。
-# 仅用本地 git 配置的最小覆盖保证确定性, 不碰你的全局配置。
 set -euo pipefail
 
 DIR="${1:-/tmp/pincer-demo}"
