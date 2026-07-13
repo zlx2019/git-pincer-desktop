@@ -349,6 +349,7 @@ impl Repo {
         for key in SCRUBBED_ENV {
             cmd.env_remove(key);
         }
+        suppress_console(&mut cmd);
         let mut child = cmd.spawn()?;
         let (tx, rx) = mpsc::channel::<(&'static str, String)>();
         let mut readers: Vec<JoinHandle<()>> = Vec::new();
@@ -592,8 +593,22 @@ fn git_at(dir: &Path, args: &[&str]) -> Result<Output, ShellError> {
     for key in SCRUBBED_ENV {
         cmd.env_remove(key);
     }
+    suppress_console(&mut cmd);
     Ok(cmd.output()?)
 }
+
+/// Windows 下抑制子进程的控制台窗口: 应用本体是 GUI 子系统(无控制台),
+/// 默认每次 spawn git 都会新开一个黑色 cmd 窗口
+#[cfg(windows)]
+fn suppress_console(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+/// 非 Windows 平台无控制台窗口问题, 空实现
+#[cfg(not(windows))]
+fn suppress_console(_cmd: &mut Command) {}
 
 /// 后台线程逐行读取子进程管道并发往通道
 fn spawn_line_reader(
