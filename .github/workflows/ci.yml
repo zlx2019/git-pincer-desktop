@@ -97,7 +97,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      # 锁定版本，避免浮动 v2 标签的上游变更导致 CI 意外失败（2026-07-13 v2.1.0 事故；dependabot 会定期升级）
+      - uses: EmbarkStudios/cargo-deny-action@v2.1.1
         with:
           manifest-path: src-tauri/Cargo.toml
 
