@@ -23,7 +23,7 @@
         .then(() => win.setFocus())
         .catch(() => {});
     });
-    // macOS 应用菜单 "设置…" → 弹全局设置对话框
+    // "设置…"(macOS 应用菜单 / 各平台托盘菜单) → 弹全局设置对话框
     let unlisten: (() => void) | undefined;
     api
       .onOpenSettings(() => (settingsUi.open = true))

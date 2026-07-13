@@ -18,8 +18,9 @@ use crate::settings::{
 /// 最近仓库列表的最大长度
 const RECENT_LIMIT: usize = 10;
 
-/// 托盘菜单项句柄 (显示窗口, 退出): 语言切换时就地改文案, 不重建托盘
+/// 托盘菜单项句柄 (显示窗口, 设置, 退出): 语言切换时就地改文案, 不重建托盘
 type TrayItems = (
+    tauri::menu::MenuItem<tauri::Wry>,
     tauri::menu::MenuItem<tauri::Wry>,
     tauri::menu::MenuItem<tauri::Wry>,
 );
@@ -87,9 +88,10 @@ pub fn apply_to_shell(app: &AppHandle, s: &Settings) {
     }
     let state = app.state::<AppState>();
     let tray = state.tray.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((show, quit)) = &*tray {
+    if let Some((show, settings, quit)) = &*tray {
         let (show_txt, quit_txt) = s.language.tray_labels();
         let _ = show.set_text(show_txt);
+        let _ = settings.set_text(s.language.settings_label());
         let _ = quit.set_text(quit_txt);
     }
     let menu_settings = state

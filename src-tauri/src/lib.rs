@@ -19,13 +19,26 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
-/// 建系统托盘: 菜单 = 显示窗口 / 退出(文案随语言设置, 切换时就地更新)。
+/// 建系统托盘: 菜单 = 显示窗口 / 设置 / 退出(文案随语言设置, 切换时就地更新)。
+/// 设置项是 Windows/Linux 的主入口(无应用菜单, 快捷键 Ctrl+, 不可发现);
 /// macOS 左键即弹菜单(菜单栏惯例); Windows/Linux 菜单挂右键, 左键单击直接唤回窗口
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let (show_txt, quit_txt) = app.state::<commands::AppState>().language().tray_labels();
+    use tauri::menu::PredefinedMenuItem;
+
+    let lang = app.state::<commands::AppState>().language();
+    let (show_txt, quit_txt) = lang.tray_labels();
     let show = MenuItem::with_id(app, "show", show_txt, true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", lang.settings_label(), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", quit_txt, true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &show,
+            &settings,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
+    )?;
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("Pincer")
         .menu(&menu)
@@ -33,6 +46,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, e| match e.id.as_ref() {
             "show" => show_main_window(app),
             "quit" => app.exit(0),
+            // "settings" 走 app 级 on_menu_event(与 macOS 应用菜单同 id 共用一份处理)
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -59,7 +73,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     }
     tray.build(app)?;
     app.state::<commands::AppState>()
-        .set_tray_items((show, quit));
+        .set_tray_items((show, settings, quit));
     Ok(())
 }
 
@@ -138,8 +152,8 @@ pub fn run() {
             Ok(())
         })
         .on_menu_event(|app, e| {
-            // 应用菜单 "设置…": 唤回窗口(可能正驻留托盘)并通知前端弹设置对话框;
-            // 托盘菜单的 show/quit 由托盘自己的 on_menu_event 处理, 此处忽略
+            // "设置…"(macOS 应用菜单与托盘菜单同 id): 唤回窗口(可能正驻留托盘)
+            // 并通知前端弹设置对话框; 托盘的 show/quit 由托盘自己的 on_menu_event 处理
             if e.id.as_ref() == "settings" {
                 show_main_window(app);
                 let _ = app.emit("app://open-settings", ());
