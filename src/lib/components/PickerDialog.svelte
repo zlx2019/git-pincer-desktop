@@ -15,6 +15,7 @@
     title,
     items,
     multi = false,
+    loading = false,
     confirmLabel,
     onconfirm,
     onclose,
@@ -22,6 +23,8 @@
     title: string;
     items: Item[];
     multi?: boolean;
+    /** 乐观弹窗: 列表数据仍在拉取中, 显示占位转圈 */
+    loading?: boolean;
     confirmLabel: string;
     onconfirm: (ids: string[]) => void;
     onclose: () => void;
@@ -46,15 +49,28 @@
     if (item.disabled || multi) return;
     onconfirm([item.id]);
   }
+
+  // 乐观弹窗会在双击的两击之间挂载, 第二击正落在刚出现的遮罩上;
+  // 忽略挂载后 250ms(双击间隔量级)内的遮罩点击, 防对话框被瞬间误关
+  const openedAt = performance.now();
+
+  /** 点遮罩空白处关闭(带误触守卫) */
+  function overlayClick(e: MouseEvent) {
+    if (e.target !== e.currentTarget) return;
+    if (performance.now() - openedAt < 250) return;
+    onclose();
+  }
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
-<div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
+<div class="overlay" role="presentation" onclick={overlayClick}>
   <div class="modal" role="dialog" aria-modal="true" aria-label={title}>
     <h3>{title}</h3>
     <div class="list">
-      {#if items.length === 0}
+      {#if loading}
+        <p class="empty"><span class="spin"></span></p>
+      {:else if items.length === 0}
         <p class="dim empty">Nothing to select.</p>
       {:else}
         {#each items as item (item.id)}
@@ -84,6 +100,7 @@
 </div>
 
 <style>
+  /* 入场动效只动 opacity/transform(合成器属性), 时长克制不挡交互 */
   .overlay {
     position: fixed;
     inset: 0;
@@ -92,6 +109,7 @@
     align-items: center;
     justify-content: center;
     z-index: 50;
+    animation: overlay-in 0.12s ease-out;
   }
 
   .modal {
@@ -103,6 +121,20 @@
     padding: 14px 16px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
     color: var(--d-text);
+    animation: modal-in 0.15s ease-out;
+  }
+
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
   }
 
   h3 {
@@ -112,6 +144,8 @@
   }
 
   .list {
+    /* 最小高度垫住 loading→数据的回填: 少量条目/转圈占位不再引起模态框高度突跳 */
+    min-height: 140px;
     max-height: 300px;
     overflow: auto;
     border: 1px solid var(--d-border);
@@ -123,9 +157,36 @@
   }
 
   .empty {
+    /* flex 列容器里上下 auto margin = 在 min-height 撑起的列表里垂直居中 */
     text-align: center;
-    margin: 18px 0;
+    margin: auto 0;
     color: var(--d-dim);
+  }
+
+  /* 数据加载中的占位转圈(乐观弹窗: 先弹后取数)。延迟 0.15s 渐显——
+     本地 git 常在百毫秒内返回, 快路径下只见稳定空列表, 不见转圈一闪而过 */
+  .spin {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--d-spin-track);
+    border-top-color: var(--d-blue-lt);
+    border-radius: 50%;
+    animation:
+      spin 0.8s linear infinite,
+      spin-appear 0.15s ease-out 0.15s backwards;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spin-appear {
+    from {
+      opacity: 0;
+    }
   }
 
   .item {
@@ -140,6 +201,7 @@
     border-radius: 6px;
     text-align: left;
     color: var(--d-text);
+    transition: background-color 0.1s ease-out;
   }
 
   .item:hover:not(:disabled) {

@@ -24,6 +24,10 @@
   let running = $state(false);
   let outputLines = $state<OutputLine[]>([]);
   let consoleEl: HTMLElement | undefined = $state();
+  // 窗口形态就位门: set_window_form 返回后才挂载内容, 掩蔽"先换页面、后跳窗口几何"
+  // 的两段突变; 只在形态真的变了时播放淡入——merge↔conflicts 同为大窗, 往返保持硬切
+  let formReady = $state(false);
+  let formChanged = $state(false);
 
   onMount(() => {
     // 直接刷新进入(dev 场景)时回打开页
@@ -34,11 +38,15 @@
     // 进入冲突页即视为接手, 清除搁置标志
     session.parked = false;
     // 冲突处理使用大窗
-    largeWindow().catch(() => {});
+    largeWindow()
+      .then((changed) => (formChanged = changed))
+      .catch(() => {})
+      .finally(() => (formReady = true));
     // 三栏页预热: 路由代码(CM6 是最大的路由块) + 所选编辑器字体,
     // 点 Merge... 时不再现场拉取/解析
     preloadCode('/merge').catch(() => {});
     ensureEditorFont();
+    preloadLanguages();
     // 冲突在终端/IDE 里产生: 窗口重获焦点时自动重探仓库状态
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -75,6 +83,28 @@
       probing = false;
       lastProbe = Date.now();
     }
+  }
+
+  /** 预热冲突文件的语法语言包(按扩展名去重, 上限 8 种): 点 Merge... 进三栏时
+      语言扩展已在模块缓存, 免去点击瞬间的首次拉取。动态 import 避免把 CM6
+      静态拖进本路由 chunk——其模块本就在上面 preloadCode('/merge') 的拉取范围内 */
+  function preloadLanguages() {
+    import('$lib/editor')
+      .then((ed) => {
+        const seen = new Set<string>();
+        for (const f of session.files) {
+          if (f.binary) continue;
+          // 去重键从文件名(非全路径)推导: 无扩展名的按整个文件名归键
+          // (Makefile 类靠文件名匹配语言), 不同目录的同名文件只占一个槽
+          const name = f.path.slice(f.path.lastIndexOf('/') + 1).toLowerCase();
+          const dot = name.lastIndexOf('.');
+          const key = dot > 0 ? name.slice(dot + 1) : name;
+          if (seen.has(key) || seen.size >= 8) continue;
+          seen.add(key);
+          void ed.languageFor(f.path);
+        }
+      })
+      .catch(() => {});
   }
 
   /** 列表身份键(重探比较用): 逐字段拼接, 免去两次整列表 JSON 序列化 */
@@ -250,9 +280,9 @@
   }
 </script>
 
-{#if session.info}
+{#if session.info && formReady}
   {@const info = session.info}
-  <div class="dialog">
+  <div class="dialog" class:page-in={formChanged}>
     <header>
       <h1>Conflicts</h1>
       <p class="subtitle">

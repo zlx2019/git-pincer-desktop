@@ -724,7 +724,6 @@
     background: var(--d-canvas);
   }
 
-  header,
   /* 底部共享横向滚动条(IDEA 式): 一根条经 linkHScroll 同步驱动三栏 scrollLeft;
      滚动条强制经典绘制(::-webkit-scrollbar)——macOS overlay 滚条不滚不现身, 失去"可发现性" */
   .hbar {
@@ -770,6 +769,7 @@
     margin-right: -2px;
   }
 
+  header,
   footer {
     display: flex;
     align-items: center;

@@ -14,6 +14,10 @@
   // 空态提示等列表拿到后再出, 避免 IPC 返回前闪一下
   let recentLoaded = $state(false);
   let opening = $state(false);
+  // 窗口形态就位门: set_window_form 返回后才挂载内容(大窗回打开页先归位小窗);
+  // 只在形态真的变了时播放淡入(菜单↔打开页同为小窗, 往返保持硬切)
+  let formReady = $state(false);
+  let formChanged = $state(false);
 
   /** 拉取最近列表(挂载与窗口聚焦时): 外部删除/移动仓库即时反映置灰 */
   function refreshRecent() {
@@ -25,7 +29,10 @@
   }
 
   onMount(() => {
-    compactWindow().catch(() => {});
+    compactWindow()
+      .then((changed) => (formChanged = changed))
+      .catch(() => {})
+      .finally(() => (formReady = true));
     // 两个可能的下一站预热: 打开仓库时目标页已就绪
     preloadCode('/menu').catch(() => {});
     preloadCode('/conflicts').catch(() => {});
@@ -80,67 +87,69 @@
 
 <svelte:window onfocus={refreshRecent} />
 
-<main class="win">
-  <div class="hero">
-    <!-- v2 logo 图形(几何同 assets/icon.svg): 挖空处用页面底色 token, 亮暗主题自适应 -->
-    <svg class="mark" viewBox="146 146 732 732" width="72" height="72" aria-hidden="true">
-      <g stroke="var(--d-orange)" stroke-width="56" stroke-linecap="round">
-        <line x1="512" y1="236" x2="512" y2="194" />
-        <line x1="617.6" y1="257" x2="633.7" y2="218.2" />
-        <line x1="707.2" y1="316.8" x2="736.9" y2="287.1" />
-        <line x1="767" y1="406.4" x2="805.8" y2="390.3" />
-        <line x1="788" y1="512" x2="830" y2="512" />
-        <line x1="767" y1="617.6" x2="805.8" y2="633.7" />
-        <line x1="707.2" y1="707.2" x2="736.9" y2="736.9" />
-        <line x1="617.6" y1="767" x2="633.7" y2="805.8" />
-        <line x1="512" y1="788" x2="512" y2="830" />
-        <line x1="406.4" y1="767" x2="390.3" y2="805.8" />
-        <line x1="316.8" y1="707.2" x2="287.1" y2="736.9" />
-        <line x1="257" y1="617.6" x2="218.2" y2="633.7" />
-        <line x1="236" y1="512" x2="194" y2="512" />
-        <line x1="257" y1="406.4" x2="218.2" y2="390.3" />
-        <line x1="316.8" y1="316.8" x2="287.1" y2="287.1" />
-        <line x1="406.4" y1="257" x2="390.3" y2="218.2" />
-      </g>
-      <circle cx="512" cy="512" r="300" fill="var(--d-orange)" />
-      <g stroke="var(--d-canvas)" stroke-width="30" stroke-linecap="round">
-        <line x1="414" y1="660" x2="512" y2="548" />
-        <line x1="610" y1="660" x2="512" y2="548" />
-        <line x1="512" y1="548" x2="512" y2="352" />
-      </g>
-      <circle cx="414" cy="660" r="32" fill="var(--d-canvas)" />
-      <circle cx="610" cy="660" r="32" fill="var(--d-canvas)" />
-      <circle cx="512" cy="352" r="40" fill="var(--d-canvas)" />
-      <circle cx="512" cy="548" r="52" fill="var(--d-canvas)" />
-      <circle cx="512" cy="548" r="22" fill="var(--d-orange)" />
-    </svg>
-    <h1 class="logo mono">PINCER</h1>
-    <button class="primary" disabled={opening} onclick={pickAndOpen}>Open Repository…</button>
-  </div>
+{#if formReady}
+  <main class="win" class:page-in={formChanged}>
+    <div class="hero">
+      <!-- v2 logo 图形(几何同 assets/icon.svg): 挖空处用页面底色 token, 亮暗主题自适应 -->
+      <svg class="mark" viewBox="146 146 732 732" width="72" height="72" aria-hidden="true">
+        <g stroke="var(--d-orange)" stroke-width="56" stroke-linecap="round">
+          <line x1="512" y1="236" x2="512" y2="194" />
+          <line x1="617.6" y1="257" x2="633.7" y2="218.2" />
+          <line x1="707.2" y1="316.8" x2="736.9" y2="287.1" />
+          <line x1="767" y1="406.4" x2="805.8" y2="390.3" />
+          <line x1="788" y1="512" x2="830" y2="512" />
+          <line x1="767" y1="617.6" x2="805.8" y2="633.7" />
+          <line x1="707.2" y1="707.2" x2="736.9" y2="736.9" />
+          <line x1="617.6" y1="767" x2="633.7" y2="805.8" />
+          <line x1="512" y1="788" x2="512" y2="830" />
+          <line x1="406.4" y1="767" x2="390.3" y2="805.8" />
+          <line x1="316.8" y1="707.2" x2="287.1" y2="736.9" />
+          <line x1="257" y1="617.6" x2="218.2" y2="633.7" />
+          <line x1="236" y1="512" x2="194" y2="512" />
+          <line x1="257" y1="406.4" x2="218.2" y2="390.3" />
+          <line x1="316.8" y1="316.8" x2="287.1" y2="287.1" />
+          <line x1="406.4" y1="257" x2="390.3" y2="218.2" />
+        </g>
+        <circle cx="512" cy="512" r="300" fill="var(--d-orange)" />
+        <g stroke="var(--d-canvas)" stroke-width="30" stroke-linecap="round">
+          <line x1="414" y1="660" x2="512" y2="548" />
+          <line x1="610" y1="660" x2="512" y2="548" />
+          <line x1="512" y1="548" x2="512" y2="352" />
+        </g>
+        <circle cx="414" cy="660" r="32" fill="var(--d-canvas)" />
+        <circle cx="610" cy="660" r="32" fill="var(--d-canvas)" />
+        <circle cx="512" cy="352" r="40" fill="var(--d-canvas)" />
+        <circle cx="512" cy="548" r="52" fill="var(--d-canvas)" />
+        <circle cx="512" cy="548" r="22" fill="var(--d-orange)" />
+      </svg>
+      <h1 class="logo mono">PINCER</h1>
+      <button class="primary" disabled={opening} onclick={pickAndOpen}>Open Repository…</button>
+    </div>
 
-  <!-- IDEA Welcome 风格: 分割线下方列表区常驻, 空列表时以提示占位不显空旷 -->
-  <section class="recent">
-    <h2>RECENT</h2>
-    {#if recent.length}
-      {#each recent as r (r.path)}
-        <div class="rrow-wrap" class:missing={r.missing}>
-          <button
-            class="rrow"
-            onclick={() => (r.missing ? toast(t('open-missing')) : openRepo(r.path))}
-          >
-            <span class="rname">{basename(r.path)}</span>
-            <span class="rpath mono">{r.path}</span>
-          </button>
-          <button class="rdel" title="Remove from recent" onclick={() => removeRecent(r.path)}>
-            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
-          </button>
-        </div>
-      {/each}
-    {:else if recentLoaded}
-      <p class="rempty">{t('open-recent-empty')}</p>
-    {/if}
-  </section>
-</main>
+    <!-- IDEA Welcome 风格: 分割线下方列表区常驻, 空列表时以提示占位不显空旷 -->
+    <section class="recent">
+      <h2>RECENT</h2>
+      {#if recent.length}
+        {#each recent as r (r.path)}
+          <div class="rrow-wrap" class:missing={r.missing}>
+            <button
+              class="rrow"
+              onclick={() => (r.missing ? toast(t('open-missing')) : openRepo(r.path))}
+            >
+              <span class="rname">{basename(r.path)}</span>
+              <span class="rpath mono">{r.path}</span>
+            </button>
+            <button class="rdel" title="Remove from recent" onclick={() => removeRecent(r.path)}>
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
+            </button>
+          </div>
+        {/each}
+      {:else if recentLoaded}
+        <p class="rempty">{t('open-recent-empty')}</p>
+      {/if}
+    </section>
+  </main>
+{/if}
 
 <style>
   .win {
@@ -174,6 +183,9 @@
     background: var(--d-blue);
     border: 1px solid var(--d-blue);
     color: #ffffff;
+    transition:
+      background-color 0.12s ease-out,
+      border-color 0.12s ease-out;
   }
 
   .primary:hover:not(:disabled) {
@@ -215,6 +227,7 @@
     background: transparent;
     color: var(--d-text);
     text-align: left;
+    transition: background-color 0.12s ease-out;
   }
 
   .rempty {
@@ -255,6 +268,7 @@
     place-items: center;
     opacity: 0;
     pointer-events: none;
+    transition: opacity 0.12s ease-out;
   }
 
   .rrow-wrap:hover .rdel,

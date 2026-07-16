@@ -41,6 +41,7 @@
 </div>
 
 <style>
+  /* 入场动效只动 opacity/transform(合成器属性), 与其余对话框同款 */
   .overlay {
     position: fixed;
     inset: 0;
@@ -49,6 +50,7 @@
     align-items: center;
     justify-content: center;
     z-index: 50;
+    animation: overlay-in 0.12s ease-out;
   }
 
   .modal {
@@ -59,6 +61,20 @@
     padding: 18px 20px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
     color: var(--d-text);
+    animation: modal-in 0.15s ease-out;
+  }
+
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
   }
 
   h3 {

@@ -20,13 +20,21 @@
     confirm: string;
     items: { id: string; label: string; sublabel?: string; disabled?: boolean }[];
     order: string[];
+    /** 乐观弹窗: 对话框先弹出, 列表数据仍在拉取中 */
+    loading?: boolean;
   }
 
   let running: LaunchKind | null = $state(null);
   let dialog: DialogSpec | null = $state(null);
-  let switchItems: { id: string; label: string; sublabel?: string; disabled?: boolean }[] | null =
-    $state(null);
+  let switchDialog: {
+    loading: boolean;
+    items: { id: string; label: string; sublabel?: string; disabled?: boolean }[];
+  } | null = $state(null);
   let termEl: HTMLElement | undefined = $state();
+  // 窗口形态就位门: set_window_form 返回后才挂载内容, 掩蔽"先换页面、后跳窗口几何"
+  // 的两段突变; 只在形态真的变了时播放淡入(同形态导航保持硬切, 不平白慢一拍)
+  let formReady = $state(false);
+  let formChanged = $state(false);
 
   // 图标为静态字面量, {@html} 安全; 短名/描述文案走 i18n 词典(act-*/actd-*)
   const actions: { kind: LaunchKind; label: string; icon: string }[] = [
@@ -58,16 +66,20 @@
   ];
 
   onMount(() => {
-    compactWindow().catch(() => {});
     if (!session.info) {
       goto('/');
       return;
     }
-    // 操作进行中且未被用户搁置 → 接管进冲突页; 搁置时留在菜单(顶部有恢复横幅)
+    // 操作进行中且未被用户搁置 → 接管进冲突页; 搁置时留在菜单(顶部有恢复横幅)。
+    // 切窗放在守卫之后: 重定向路径不再先切小窗又被目标页切回大窗
     if (session.info.op && !session.parked) {
       goto('/conflicts');
       return;
     }
+    compactWindow()
+      .then((changed) => (formChanged = changed))
+      .catch(() => {})
+      .finally(() => (formReady = true));
     // 冲突页代码预热: 出现冲突接管时不再现场拉取/解析模块
     preloadCode('/conflicts').catch(() => {});
     // 终端里发起的操作也要能接管: 聚焦时重探
@@ -113,18 +125,25 @@
     goto('/conflicts');
   }
 
-  /** 打开分支切换对话框(当前分支置顶且置灰) */
+  /** 打开分支切换对话框(当前分支置顶且置灰): 乐观先弹 loading, 分支列表回来再填充 */
   async function askSwitch() {
-    if (running || dialog) return;
+    if (running || dialog || switchDialog) return;
+    switchDialog = { loading: true, items: [] };
     try {
       const bs = (await api.branches()).sort((a, b) => Number(b.current) - Number(a.current));
-      switchItems = bs.map((b) => ({
-        id: b.name,
-        label: b.name,
-        sublabel: b.current ? 'current' : undefined,
-        disabled: b.current,
-      }));
+      // 等待期间用户已按 Esc 关闭: 丢弃迟到的数据
+      if (!switchDialog) return;
+      switchDialog = {
+        loading: false,
+        items: bs.map((b) => ({
+          id: b.name,
+          label: b.name,
+          sublabel: b.current ? 'current' : undefined,
+          disabled: b.current,
+        })),
+      };
     } catch (e) {
+      switchDialog = null;
       toast(String(e));
     }
   }
@@ -132,7 +151,7 @@
   /** 执行切换: 回执进终端, 失败原样透出 git 的说明(如工作区有未提交改动) */
   async function doSwitch(ids: string[]) {
     const name = ids[0];
-    switchItems = null;
+    switchDialog = null;
     pushTerm({ kind: 'cmd', text: `git switch ${name}` });
     try {
       await api.switchBranch(name);
@@ -143,9 +162,10 @@
     }
   }
 
-  /** ⌘/Ctrl + 1..5 触发对应操作 */
+  /** ⌘/Ctrl + 1..5 触发对应操作(内容未挂载的就位空窗期不响应, 避免无反馈触发) */
   function hotkey(e: KeyboardEvent) {
-    if (!(e.metaKey || e.ctrlKey) || dialog || switchItems || settingsUi.open || running) return;
+    if (!formReady) return;
+    if (!(e.metaKey || e.ctrlKey) || dialog || switchDialog || settingsUi.open || running) return;
     const idx = ['1', '2', '3', '4', '5'].indexOf(e.key);
     if (idx >= 0) {
       e.preventDefault();
@@ -153,7 +173,8 @@
     }
   }
 
-  /** 点操作: pull 直接执行, merge/rebase 弹分支选择, cherry-pick/revert 弹提交选择 */
+  /** 点操作: pull 直接执行, merge/rebase 弹分支选择, cherry-pick/revert 弹提交选择。
+      对话框乐观先弹(loading 态), 数据回来再填充——点击瞬间即有视觉反馈 */
   async function act(kind: LaunchKind) {
     // 已有操作进行中(搁置状态)时不允许再发起, git 也会拒绝
     if (running || session.info?.op) return;
@@ -162,13 +183,22 @@
       if (kind === 'pull') {
         await run(kind, []);
       } else if (kind === 'merge' || kind === 'rebase') {
-        // 当前分支置顶(IDEA 习惯), 其余保持 git 的字母序
-        const bs = (await api.branches()).sort((a, b) => Number(b.current) - Number(a.current));
         dialog = {
           kind,
           multi: false,
           confirm: kind === 'merge' ? 'Merge' : 'Rebase',
           title: kind === 'merge' ? t('dlg-merge', current) : t('dlg-rebase', current),
+          items: [],
+          order: [],
+          loading: true,
+        };
+        // 当前分支置顶(IDEA 习惯), 其余保持 git 的字母序
+        const bs = (await api.branches()).sort((a, b) => Number(b.current) - Number(a.current));
+        // 等待期间对话框已被关闭: 丢弃迟到的数据
+        if (dialog?.kind !== kind) return;
+        dialog = {
+          ...dialog,
+          loading: false,
           items: bs.map((b) => ({
             id: b.name,
             label: b.name,
@@ -178,12 +208,20 @@
           order: bs.map((b) => b.name),
         };
       } else {
-        const cs = await api.commits(kind === 'cherry-pick', 30);
         dialog = {
           kind,
           multi: true,
           confirm: kind === 'cherry-pick' ? 'Cherry-pick' : 'Revert',
           title: kind === 'cherry-pick' ? t('dlg-cherry-pick') : t('dlg-revert'),
+          items: [],
+          order: [],
+          loading: true,
+        };
+        const cs = await api.commits(kind === 'cherry-pick', 30);
+        if (dialog?.kind !== kind) return;
+        dialog = {
+          ...dialog,
+          loading: false,
           items: cs.map((c) => ({
             id: c.sha,
             label: c.subject,
@@ -194,13 +232,15 @@
         };
       }
     } catch (e) {
+      // 取数失败: 收回乐观弹出的对话框, 错误走 toast
+      if (dialog?.kind === kind) dialog = null;
       toast(String(e));
     }
   }
 
   /** 对话框确认: 列表为新→旧, cherry-pick 需按旧→新逐个应用, revert 保持新→旧 */
   function confirmDialog(ids: string[]) {
-    if (!dialog) return;
+    if (!dialog || dialog.loading) return;
     const order = dialog.order;
     const byOrder = [...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b));
     const targets = dialog.kind === 'cherry-pick' ? byOrder.reverse() : byOrder;
@@ -257,9 +297,9 @@
 
 <svelte:window onkeydown={hotkey} />
 
-{#if session.info}
+{#if session.info && formReady}
   {@const info = session.info}
-  <div class="win">
+  <div class="win" class:page-in={formChanged}>
     <div class="topbar">
       <span class="chip" title={info.root}>
         <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
@@ -394,19 +434,21 @@
     title={dialog.title}
     items={dialog.items}
     multi={dialog.multi}
+    loading={dialog.loading ?? false}
     confirmLabel={dialog.confirm}
     onconfirm={confirmDialog}
     onclose={() => (dialog = null)}
   />
 {/if}
 
-{#if switchItems}
+{#if switchDialog}
   <PickerDialog
     title={t('dlg-switch')}
-    items={switchItems}
+    items={switchDialog.items}
+    loading={switchDialog.loading}
     confirmLabel="Switch"
     onconfirm={doSwitch}
-    onclose={() => (switchItems = null)}
+    onclose={() => (switchDialog = null)}
   />
 {/if}
 
@@ -487,6 +529,13 @@
     color: var(--d-text);
   }
 
+  .iconbtn,
+  .chip {
+    transition:
+      background-color 0.12s ease-out,
+      color 0.12s ease-out;
+  }
+
   /* ── 指令面板 ──────────────────────────── */
   .body {
     flex: 1;
@@ -523,6 +572,7 @@
     gap: 10px;
     width: 100%;
     height: auto;
+    flex: none;
     padding: 8px 10px;
     margin-bottom: 8px;
     border: 1px solid rgba(217, 163, 67, 0.35);
@@ -530,6 +580,7 @@
     background: rgba(217, 163, 67, 0.08);
     color: var(--d-text);
     text-align: left;
+    transition: background-color 0.12s ease-out;
   }
 
   .resume:hover {
@@ -590,6 +641,9 @@
     background: transparent;
     color: var(--d-text);
     text-align: left;
+    /* 行高恒定(描述行常驻占位), 空间不足时收缩的是可滚动的终端块 */
+    flex: none;
+    transition: background-color 0.12s ease-out;
   }
 
   .row:hover:not(:disabled),
@@ -606,6 +660,7 @@
     place-items: center;
     color: var(--d-dim);
     flex: none;
+    transition: color 0.12s ease-out;
   }
 
   .row:hover:not(:disabled) .ricon,
@@ -634,6 +689,7 @@
   .rzh {
     color: var(--d-dim);
     font-size: 11px;
+    transition: color 0.12s ease-out;
   }
 
   .row:hover:not(:disabled) .rzh,
@@ -641,15 +697,21 @@
     color: var(--d-sel-text);
   }
 
+  /* 描述行常驻占位(行高恒为两行), hover 仅做透明度渐显——
+     原先 display:none→block 的切换会把下方行与终端块整体推挤, 鼠标扫过列表时逐行抖动 */
   .rdesc {
-    display: none;
     font-size: 11px;
     color: var(--d-desc);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
   }
 
   .row:hover:not(:disabled) .rdesc,
   .row.running .rdesc {
-    display: block;
+    opacity: 1;
   }
 
   .kbd {
@@ -660,6 +722,10 @@
     font-size: 11px;
     color: var(--d-dim);
     flex: none;
+    transition:
+      background-color 0.12s ease-out,
+      border-color 0.12s ease-out,
+      color 0.12s ease-out;
   }
 
   .row:hover:not(:disabled) .kbd {
@@ -671,7 +737,7 @@
   .spin {
     width: 13px;
     height: 13px;
-    border: 2px solid rgba(138, 180, 255, 0.3);
+    border: 2px solid var(--d-spin-track);
     border-top-color: var(--d-blue-lt);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;

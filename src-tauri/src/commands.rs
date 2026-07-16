@@ -195,6 +195,8 @@ fn emit_output(app: &AppHandle, lines: Vec<(&'static str, String)>) {
 
 /// 应用窗口形态: 最小尺寸/尺寸/定位一次完成(单次 IPC, 无多段跳变);
 /// 形态未变时为空操作——不把用户手动移动或调整过的窗口拽回屏幕中心。
+/// 返回形态是否真的发生了变化: 前端以此决定是否播放内容入场淡入
+/// (只掩蔽真实的窗口几何突变, 同形态导航保持硬切)。
 /// 尺寸规则: 用户手动调整过的尺寸按形态记进设置落盘(切换时快照旧形态),
 /// 应用时记忆值优先(钳到形态最小尺寸), 没调过用出厂默认——跨启动贴合使用习惯。
 /// 定位规则: 切换时记住旧形态当前位置(仅内存), 该形态本次运行内出现过就原位恢复
@@ -205,16 +207,16 @@ pub async fn set_window_form(
     app: AppHandle,
     state: State<'_, AppState>,
     form: WinForm,
-) -> Result<(), ShellError> {
+) -> Result<bool, ShellError> {
     let prev = {
         let mut cur = state.win_form.lock().unwrap_or_else(|e| e.into_inner());
         if *cur == Some(form) {
-            return Ok(());
+            return Ok(false);
         }
         cur.replace(form)
     };
     let Some(win) = app.get_webview_window("main") else {
-        return Ok(());
+        return Ok(false);
     };
     if let Some(prev) = prev {
         if let Ok(pos) = win.outer_position() {
@@ -252,7 +254,7 @@ pub async fn set_window_form(
         Some(p) => win.set_position(p).map_err(join_err)?,
         None => win.center().map_err(join_err)?,
     }
-    Ok(())
+    Ok(true)
 }
 
 /// 把窗口当前逻辑尺寸快照进指定形态的设置字段(纯内存), 返回更新后的设置副本供落盘;
