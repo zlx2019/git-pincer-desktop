@@ -66,6 +66,7 @@
   --d-desc: #9db4d8; /* 菜单行 hover 描述文字 */
   --d-table: #26282b; /* 冲突列表表体底 */
   --d-term-border: #121316; /* 控制台描边 */
+  --d-spin-track: rgba(138, 180, 255, 0.3); /* 加载转圈轨道环(弧段用 --d-blue-lt) */
 
   /* 三栏 chunk 底色(IDEA Dark diff 初值, M5 逐像素校准) */
   --chunk-added: #294436;
@@ -105,6 +106,7 @@ html[data-theme='light'] {
   --d-desc: #44608f;
   --d-table: #ffffff;
   --d-term-border: #e3e4e8;
+  --d-spin-track: rgba(53, 116, 240, 0.25);
 
   --chunk-added: #d8f0dc;
   --chunk-modified: #d5e4ff;
@@ -140,6 +142,20 @@ body {
 
 .dim {
   color: var(--d-dim);
+}
+
+/* 页面内容入场淡入(仅 opacity, 合成器承担): 配合各路由的"窗口形态就绪门"——
+   内容等 set_window_form 返回后才挂载, 原生 resize 发生在空画布上, 掩蔽
+   "先换内容、后跳几何"的两段式突变; 仅在命令返回"形态真的变了"时挂此类
+   (menu↔conflicts 这类真形变), 同形态导航保持硬切不平白慢一拍 */
+.page-in {
+  animation: page-in 0.16s ease-out;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
 }
 
 button {
